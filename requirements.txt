@@ -1,0 +1,8 @@
+scikit-learn
+matplotlib
+pandas
+numpy
+sktime
+wandb
+fluke-fl==0.7.2
+numba
