@@ -3,6 +3,7 @@ import pandas as pd
 import random
 from sktime.transformations.panel.rocket import Rocket
 from sklearn.preprocessing import LabelEncoder
+from parallel_utils import transform_features
 
 # Better interface with helper functions
 class RocketKernel:
@@ -23,8 +24,9 @@ class RocketKernel:
         return X_transformed
 
 def transform_seeds(X, seeds, ts_length):
-    K = [RocketKernel(int(seed), ts_length, ppv_only=True) for seed in seeds]
-    return np.concatenate([k.transform(X) for k in K], axis=1)
+    if np.asarray(X).shape[-1] != ts_length:
+        raise ValueError("ts_length must match the input time dimension")
+    return transform_features(X, seeds)
 
 def get_binary_dataset_names():
     return [

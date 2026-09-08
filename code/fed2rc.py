@@ -14,21 +14,7 @@ from fluke.utils import OptimizerConfigurator  # NOQA
 from rich.progress import track
 from sklearn.linear_model import RidgeClassifierCV  # NOQA
 from sklearn.metrics import accuracy_score
-from sktime.transformations.panel.rocket import Rocket
-
-FEAT_CACHE = {}
-
-
-def get_from_cache(client_id: int, seed: int) -> np.ndarray:
-    if client_id in FEAT_CACHE and seed in FEAT_CACHE[client_id]:
-        return FEAT_CACHE[client_id][seed]
-    return None
-
-
-def put_in_cache(client_id: int, seed: int, value: np.ndarray) -> None:
-    if client_id not in FEAT_CACHE:
-        FEAT_CACHE[client_id] = {}
-    FEAT_CACHE[client_id][seed] = value
+from parallel_utils import FEATURE_CACHE as FEAT_CACHE, select_lambda, transform_features
 
 
 def transform(X: np.ndarray,
@@ -36,25 +22,8 @@ def transform(X: np.ndarray,
               seed: int,
               ppv_only: bool = True,
               caching: bool = True) -> np.ndarray:
-    if caching:
-        cached = get_from_cache(client_id, seed)
-        if cached is not None:
-            return cached
-
-    rocket = Rocket(num_kernels=1, random_state=seed, n_jobs=1)
-    rocket.fit(np.zeros((1, 1, X.shape[1])))
-
-    if len(X.shape) <= 1:
-        X = X.reshape(1, -1)
-
-    X_transformed = rocket.transform(np.expand_dims(X, 1)).to_numpy()
-    if ppv_only:
-        X_transformed = X_transformed[:, 0:1]
-
-    if caching:
-        put_in_cache(client_id, seed, X_transformed)
-
-    return X_transformed
+    # client_id is retained for API compatibility; dataset content is the key.
+    return transform_features(X, [seed], ppv_only=ppv_only, caching=caching)
 
 
 def transform_seeds(X: np.ndarray,
@@ -62,9 +31,10 @@ def transform_seeds(X: np.ndarray,
                     seeds: Iterable[int],
                     caching: bool = True,
                     use_torch: bool = False) -> Union[np.ndarray, torch.Tensor]:
-    Xnp = np.concatenate([transform(X, client_id, int(seed), caching=caching)
-                         for seed in seeds], axis=1)
-    return torch.tensor(Xnp, dtype=torch.float32) if use_torch else Xnp.astype(np.float32)
+    if isinstance(X, torch.Tensor):
+        X = X.detach().cpu().numpy()
+    Xnp = transform_features(X, seeds, caching=caching)
+    return torch.tensor(Xnp, dtype=torch.float32) if use_torch else Xnp
 
 
 class RidgeTorchModel(torch.nn.Module):
@@ -180,20 +150,9 @@ class ClientFed2RC(Client):
         A_minus_client = A_global - self.A
         b_minus_client = b_global - self.b
 
-        best_accuracy = 0
-        tmp_lambda = 0
-
-        for cv_lambda in np.logspace(-3, 0, 100):
-            local_A_final = A_minus_client + cv_lambda * np.eye(A_global.shape[0])
-            local_W_final = np.linalg.solve(local_A_final, b_minus_client)
-            local_W_final = local_W_final / \
-                (np.linalg.norm(local_W_final, axis=0, keepdims=True) + 1e-10)
-            local_y_pred = np.argmax(X_trans @ local_W_final, axis=1)
-            local_accuracy = accuracy_score(y, local_y_pred)
-            if best_accuracy < local_accuracy or \
-                    (best_accuracy == local_accuracy and cv_lambda > tmp_lambda):
-                tmp_lambda = cv_lambda
-                best_accuracy = local_accuracy
+        tmp_lambda, best_accuracy, _ = select_lambda(
+            A_minus_client, b_minus_client, X_trans, y, np.logspace(-3, 0, 100)
+        )
 
         self.channel.send(Message((tmp_lambda * best_accuracy, best_accuracy),
                           "lambda", self), self.server)

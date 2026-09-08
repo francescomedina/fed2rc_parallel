@@ -14,6 +14,7 @@ from sklearn.linear_model import RidgeClassifierCV
 from sklearn.model_selection import train_test_split
 from utils import load_dataset, preprocess_data, split_function, RocketKernel, transform_seeds, get_binary_dataset_names, get_three_classes_dataset_names, get_four_classes_dataset_names, get_multiclasses_dataset_names
 from sklearn.preprocessing import LabelBinarizer
+from parallel_utils import select_lambda
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--clients', type=int, default=4, help='Choose the number of parties of the federation')
@@ -190,23 +191,13 @@ def main():
                 A_minus_client = A_global - A_locals[client_id]
                 b_minus_client = b_global - b_locals[client_id]
                 
-                for cv_lambda in np.logspace(-3,0,100):
-                    if args.validation == False:
-                        local_A_final = A_minus_client + cv_lambda * np.eye(A_global.shape[0])
-                        local_W_final = np.linalg.solve(local_A_final, b_minus_client)
-                    else:
-                        local_A_final = A_global + cv_lambda * np.eye(A_global.shape[0])
-                        local_W_final = np.linalg.solve(local_A_final, b_global)
-                    local_W_final =  local_W_final / (np.linalg.norm(local_W_final, axis=0, keepdims=True) + 1e-10)
-                    local_y_pred = np.argmax(x_trans @ local_W_final, axis=1)
-                    if args.validation == False:
-                        local_accuracy = accuracy_score(y_train, local_y_pred)
-                    else:
-                        local_accuracy = accuracy_score(y_val, local_y_pred)
-                    if best_accuracy < local_accuracy or (best_accuracy == local_accuracy and cv_lambda > tmp_lambda):
-                        tmp_lambda = cv_lambda
-                        best_accuracy = local_accuracy
-                    #print("Client: ", client_id, "best local accuracy: ", local_accuracy, "with lambda: ", cv_lambda)
+                tmp_lambda, best_accuracy, _ = select_lambda(
+                    A_global if args.validation else A_minus_client,
+                    b_global if args.validation else b_minus_client,
+                    x_trans,
+                    y_val if args.validation else y_train,
+                    np.logspace(-3, 0, 100),
+                )
                 local_best_lambdas = np.concatenate([local_best_lambdas, [tmp_lambda * best_accuracy]])
                 local_best_accs = np.concatenate([local_best_accs, [best_accuracy]])
 

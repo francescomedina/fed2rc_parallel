@@ -2,7 +2,10 @@ scikit-learn
 matplotlib
 pandas
 numpy
-sktime
+# The native ROCKET adapter is regression-tested against this private kernel API.
+sktime==1.1.0
 wandb
 fluke-fl==0.7.2
 numba
+scipy
+threadpoolctl
