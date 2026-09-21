@@ -1,3 +1,16 @@
+import importlib.metadata
+_orig_dist = importlib.metadata.distribution
+
+def _safe_dist(name):
+    try:
+        return _orig_dist(name)
+    except importlib.metadata.PackageNotFoundError:
+        return _orig_dist(name.replace(".", "-"))
+
+importlib.metadata.distribution = _safe_dist
+importlib.metadata.version = lambda name: _safe_dist(name).version
+
+
 import numpy as np
 import pandas as pd
 import random
@@ -127,7 +140,10 @@ def main():
                     client_seeds = dict_seeds[client_id]
                     x_trans = transform_seeds(x_train, client_seeds, ts_length)
                     model = RidgeClassifierCV(alphas=np.logspace(-3,0,100)).fit(x_trans, y_train)
-                    w = model.coef_[0] 
+                    # coef_ is 1-D (n_features,) for binary targets and 2-D
+                    # (n_classes, n_features) otherwise; atleast_2d normalizes
+                    # both to a row so [0] always selects the full weight vector.
+                    w = np.atleast_2d(model.coef_)[0]
                     train_acc = model.score(x_trans, y_train)
                     train_accuracies = np.concatenate([train_accuracies, [train_acc]])
                     top_k_idx = np.argsort(-np.abs(w))[:top_k_per_client]

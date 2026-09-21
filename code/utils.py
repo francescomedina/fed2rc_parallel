@@ -125,10 +125,34 @@ def load_dataset(ds_name):
     Y_test = LE.transform(Y_test)
     return X_train, Y_train, X_test, Y_test
 
+def _ffill(X, mask):
+    idx = np.where(~mask, np.arange(X.shape[1]), 0)
+    np.maximum.accumulate(idx, axis=1, out=idx)
+    return X[np.arange(X.shape[0])[:, None], idx]
+
+def _fill_nan(X):
+    # Some UCR datasets hold NaNs the archive doesn't pad away: DodgerLoopDay/
+    # Game/Weekend and MelbournePedestrian have scattered missing timepoints
+    # (real sensor dropouts, possibly leading a series); AllGestureWiimoteX/Y/Z,
+    # GestureMidAirD1/D2/D3, PLAID, ... right-pad variable-length series with
+    # trailing NaN to a common width. Forward-fill handles both, then
+    # backward-fill covers NaNs with no prior value (e.g. a leading dropout).
+    X = np.asarray(X, dtype=float)
+    mask = np.isnan(X)
+    if not mask.any():
+        return X
+    filled = _ffill(X, mask)
+    still_missing = np.isnan(filled)
+    if still_missing.any():
+        backfilled = _ffill(X[:, ::-1], mask[:, ::-1])[:, ::-1]
+        filled = np.where(still_missing, backfilled, filled)
+    return filled
+
 def preprocess_data(X_train, Y_train, X_test, Y_test):
     # TODO: Scale each time series?
-    # TODO: NaN values? Should be none in the data
     # TODO: LabelEncoder necessary if we do not use PyTorch?
+    X_train = _fill_nan(X_train)
+    X_test = _fill_nan(X_test)
     return X_train, Y_train, X_test, Y_test
 
 # Split data continuously
