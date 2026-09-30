@@ -26,10 +26,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Dataset
-
-UCRArchive_2018/
-
 # PyInstaller
 #   Usually these files are written by a python script from a template
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -206,6 +202,7 @@ cython_debug/
 # .vscode/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
+UCRArchive_2018/
 
 # Ruff stuff:
 .ruff_cache/

@@ -1,0 +1,229 @@
+{
+  "baseline_commit": "209009c55b6b4d84b748ac5043ab48ee568fe4e5",
+  "system": "macOS-27.0-arm64-arm-64bit",
+  "machine": "arm64",
+  "processor": "arm",
+  "logical_cpus": 10,
+  "python": "3.12.12",
+  "versions": {
+    "numpy": "2.4.6",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.7.2",
+    "sktime": "1.1.0",
+    "numba": "0.67.0",
+    "threadpoolctl": "3.7.0"
+  },
+  "runtime": {
+    "openmp": 202011,
+    "default_threads": 4,
+    "probe_team_size": 4,
+    "runtime_max_threads": 1
+  },
+  "threadpools": [
+    {
+      "user_api": "openmp",
+      "internal_api": "openmp",
+      "num_threads": 4,
+      "prefix": "libomp",
+      "filepath": "/Users/francesco/unito/fed2rc_openmp/.venv/lib/python3.12/site-packages/sklearn/.dylibs/libomp.dylib",
+      "version": null
+    },
+    {
+      "user_api": "blas",
+      "internal_api": "openblas",
+      "num_threads": 1,
+      "prefix": "libopenblas",
+      "filepath": "/opt/homebrew/Cellar/openblas/0.3.30/lib/libopenblasp-r0.3.30.dylib",
+      "version": "0.3.30",
+      "threading_layer": "openmp",
+      "architecture": "neoversen1"
+    },
+    {
+      "user_api": "openmp",
+      "internal_api": "openmp",
+      "num_threads": 1,
+      "prefix": "libomp",
+      "filepath": "/opt/homebrew/Cellar/libomp/20.1.8/lib/libomp.dylib",
+      "version": null
+    },
+    {
+      "user_api": "openmp",
+      "internal_api": "openmp",
+      "num_threads": 1,
+      "prefix": "libgomp",
+      "filepath": "/opt/homebrew/Cellar/gcc/15.1.0/lib/gcc/current/libgomp.1.dylib",
+      "version": null
+    }
+  ],
+  "dimensions": {
+    "samples": 256,
+    "timepoints": 256,
+    "kernels": 128,
+    "features": 128,
+    "classes": 3,
+    "lambdas": 64
+  },
+  "repeats": 5,
+  "validation": "exact PPV, lambda and accuracy-vector agreement",
+  "timing_scope": "Full helper calls, including checks/packing; excludes imports/data/warmup. Native parameter cache warm; original includes fit each call. BLAS single-threaded. Native speedup compares identical code. Original ratio also includes serial optimizations and BLAS differences.",
+  "execution_orders": [
+    [
+      "lambda/native_1",
+      "transform/native_2",
+      "transform/native_4",
+      "lambda/native_4",
+      "transform/native_1",
+      "lambda/native_2",
+      "transform/original",
+      "lambda/original"
+    ],
+    [
+      "lambda/native_1",
+      "lambda/native_4",
+      "transform/native_1",
+      "transform/original",
+      "transform/native_2",
+      "transform/native_4",
+      "lambda/native_2",
+      "lambda/original"
+    ],
+    [
+      "lambda/native_1",
+      "lambda/native_2",
+      "transform/native_1",
+      "transform/native_2",
+      "lambda/original",
+      "transform/native_4",
+      "lambda/native_4",
+      "transform/original"
+    ],
+    [
+      "transform/native_1",
+      "lambda/original",
+      "transform/original",
+      "lambda/native_4",
+      "transform/native_2",
+      "transform/native_4",
+      "lambda/native_2",
+      "lambda/native_1"
+    ],
+    [
+      "lambda/native_2",
+      "transform/native_1",
+      "lambda/native_4",
+      "lambda/native_1",
+      "lambda/original",
+      "transform/original",
+      "transform/native_4",
+      "transform/native_2"
+    ]
+  ],
+  "results": {
+    "transform": {
+      "original": {
+        "median_seconds": 0.3168033749680035,
+        "seconds": [
+          0.30415412498405203,
+          0.3047949579777196,
+          0.3168033749680035,
+          0.32073941599810496,
+          0.3201192079577595
+        ]
+      },
+      "native": [
+        {
+          "threads": 1,
+          "median_seconds": 0.02995720796752721,
+          "seconds": [
+            0.029798875038977712,
+            0.031166541972197592,
+            0.029714208969380707,
+            0.02995720796752721,
+            0.030627000029198825
+          ],
+          "native_speedup": 1.0,
+          "original_over_native": 10.57519697134024
+        },
+        {
+          "threads": 2,
+          "median_seconds": 0.01556012500077486,
+          "seconds": [
+            0.015488707984331995,
+            0.016013915999792516,
+            0.015419167000800371,
+            0.01576354098506272,
+            0.01556012500077486
+          ],
+          "native_speedup": 1.9252549684552924,
+          "original_over_native": 20.35995051146616
+        },
+        {
+          "threads": 4,
+          "median_seconds": 0.008210416999645531,
+          "seconds": [
+            0.008165999955963343,
+            0.008210416999645531,
+            0.008156707976013422,
+            0.00824854098027572,
+            0.0082562500028871
+          ],
+          "native_speedup": 3.648682882832937,
+          "original_over_native": 38.58554017191585
+        }
+      ]
+    },
+    "lambda": {
+      "original": {
+        "median_seconds": 0.013964875019155443,
+        "seconds": [
+          0.013822291046380997,
+          0.013964875019155443,
+          0.013893249968532473,
+          0.014440542028751224,
+          0.014941125002223998
+        ]
+      },
+      "native": [
+        {
+          "threads": 1,
+          "median_seconds": 0.008616290986537933,
+          "seconds": [
+            0.008590082987211645,
+            0.009213500015903264,
+            0.00870970799587667,
+            0.00857195898424834,
+            0.008616290986537933
+          ],
+          "native_speedup": 1.0,
+          "original_over_native": 1.6207524839834357
+        },
+        {
+          "threads": 2,
+          "median_seconds": 0.004748083010781556,
+          "seconds": [
+            0.0045547919580712914,
+            0.004777124966494739,
+            0.004542207985650748,
+            0.004788249963894486,
+            0.004748083010781556
+          ],
+          "native_speedup": 1.8146883630662667,
+          "original_over_native": 2.9411606720954864
+        },
+        {
+          "threads": 4,
+          "median_seconds": 0.002545583003666252,
+          "seconds": [
+            0.002453041961416602,
+            0.002578833024017513,
+            0.002433959045447409,
+            0.002545583003666252,
+            0.0025685830041766167
+          ],
+          "native_speedup": 3.384800642575159,
+          "original_over_native": 5.485924049242419
+        }
+      ]
+    }
+  }
+}

@@ -3,8 +3,7 @@ import pandas as pd
 import random
 from sktime.transformations.panel.rocket import Rocket
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
-from parallel_utils import transform_features
+from openmp_utils import transform_features
 
 # Better interface with helper functions
 class RocketKernel:
@@ -26,36 +25,8 @@ class RocketKernel:
 
 def transform_seeds(X, seeds, ts_length):
     if np.asarray(X).shape[-1] != ts_length:
-        raise ValueError("ts_length must match the input time dimension")
+        raise ValueError("ts_length must match the input series length")
     return transform_features(X, seeds)
-
-def transform_seeds_classic(X, seeds, ts_length):
-    # Pre-parallelization implementation (git rev 209009c): one sktime Rocket
-    # instance per seed, transformed in a plain Python loop. No Numba map, no
-    # feature cache. Kept as the "classic" engine so fed2rc_no_fluke.py can
-    # run a genuine, unmodified serial baseline instead of a static CSV.
-    if np.asarray(X).shape[-1] != ts_length:
-        raise ValueError("ts_length must match the input time dimension")
-    K = [RocketKernel(int(seed), ts_length, ppv_only=True) for seed in seeds]
-    return np.concatenate([k.transform(X) for k in K], axis=1)
-
-def select_lambda_classic(A, b, X, y, lambdas):
-    # Pre-parallelization implementation (git rev 209009c): a plain Python
-    # loop over candidate lambdas instead of parallel_utils.select_lambda's
-    # Numba map. Same tie-break (highest accuracy, then highest lambda) so
-    # it is a drop-in "classic" baseline for the ridge regularizer search.
-    best_lambda, best_accuracy = 0, 0
-    accuracies = np.empty(len(lambdas), dtype=np.float64)
-    for i, lam in enumerate(lambdas):
-        A_final = A + lam * np.eye(A.shape[0])
-        W_final = np.linalg.solve(A_final, b)
-        W_final = W_final / (np.linalg.norm(W_final, axis=0, keepdims=True) + 1e-10)
-        y_pred = np.argmax(X @ W_final, axis=1)
-        accuracy = accuracy_score(y, y_pred)
-        accuracies[i] = accuracy
-        if best_accuracy < accuracy or (best_accuracy == accuracy and lam > best_lambda):
-            best_lambda, best_accuracy = lam, accuracy
-    return float(best_lambda), float(best_accuracy), accuracies
 
 def get_binary_dataset_names():
     return [
@@ -154,34 +125,10 @@ def load_dataset(ds_name):
     Y_test = LE.transform(Y_test)
     return X_train, Y_train, X_test, Y_test
 
-def _ffill(X, mask):
-    idx = np.where(~mask, np.arange(X.shape[1]), 0)
-    np.maximum.accumulate(idx, axis=1, out=idx)
-    return X[np.arange(X.shape[0])[:, None], idx]
-
-def _fill_nan(X):
-    # Some UCR datasets hold NaNs the archive doesn't pad away: DodgerLoopDay/
-    # Game/Weekend and MelbournePedestrian have scattered missing timepoints
-    # (real sensor dropouts, possibly leading a series); AllGestureWiimoteX/Y/Z,
-    # GestureMidAirD1/D2/D3, PLAID, ... right-pad variable-length series with
-    # trailing NaN to a common width. Forward-fill handles both, then
-    # backward-fill covers NaNs with no prior value (e.g. a leading dropout).
-    X = np.asarray(X, dtype=float)
-    mask = np.isnan(X)
-    if not mask.any():
-        return X
-    filled = _ffill(X, mask)
-    still_missing = np.isnan(filled)
-    if still_missing.any():
-        backfilled = _ffill(X[:, ::-1], mask[:, ::-1])[:, ::-1]
-        filled = np.where(still_missing, backfilled, filled)
-    return filled
-
 def preprocess_data(X_train, Y_train, X_test, Y_test):
     # TODO: Scale each time series?
+    # TODO: NaN values? Should be none in the data
     # TODO: LabelEncoder necessary if we do not use PyTorch?
-    X_train = _fill_nan(X_train)
-    X_test = _fill_nan(X_test)
     return X_train, Y_train, X_test, Y_test
 
 # Split data continuously
@@ -242,19 +189,21 @@ def split_data_uniform(features, target, num_clients, rng):
     return X_clients, Y_clients
 
 # Random split data
-def split_data_random(features, target, num_clients, random_state):
-    features = np.asarray(features)
-    target = np.asarray(target)
-    shuffled_indices = random_state.permutation(len(features))
-    features, target = features[shuffled_indices], target[shuffled_indices]
+def split_data_random(features, target, num_clients):
+    combined_df = pd.concat([features, target], axis=1)
+
+    combined_df = combined_df.sample(frac=1, random_state=myseed).reset_index(drop=True)
 
     client_data = []
-    data_per_client = len(features) // num_clients
+    data_per_client = len(combined_df) // num_clients
 
     for i in range(num_clients):
         start_idx = i * data_per_client
         end_idx = (i + 1) * data_per_client
-        client_data.append((features[start_idx:end_idx], target[start_idx:end_idx]))
+        client_df = combined_df[start_idx:end_idx]
+        client_features = client_df.iloc[:, :-1]
+        client_target = client_df.iloc[:, -1]
+        client_data.append((client_features, client_target))
 
     return client_data
 
@@ -264,6 +213,6 @@ def split_function(features, target, num_clients, random_state, my_split='unifor
     elif my_split == 'uniform':
         return split_data_uniform(features, target, num_clients, random_state)
     elif my_split == 'random':
-        return split_data_random(features, target, num_clients, random_state)
+        return split_data_random(features, target, num_clients)
     else:
         raise ValueError("Invalid split type. Choose 'continuous', 'uniform', or 'random'.")

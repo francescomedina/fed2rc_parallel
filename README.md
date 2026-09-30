@@ -54,3 +54,8 @@ The results directory reports the accuracy and F1-score metrics for all datasets
 * Mirko Polato <mirko.polato@unito.it>
 
 * Roberto Esposito <roberto.esposito@unito.it>
+
+## Native OpenMP implementation
+
+See [OPENMP.md](OPENMP.md) for build instructions, numerical regression tests,
+and the shared-memory C++ implementation of ROCKET transforms and lambda search.

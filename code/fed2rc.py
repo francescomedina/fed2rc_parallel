@@ -14,15 +14,16 @@ from fluke.utils import OptimizerConfigurator  # NOQA
 from rich.progress import track
 from sklearn.linear_model import RidgeClassifierCV  # NOQA
 from sklearn.metrics import accuracy_score
-from parallel_utils import FEATURE_CACHE as FEAT_CACHE, select_lambda, transform_features
-
+from sktime.transformations.panel.rocket import Rocket
+from openmp_utils import transform_features, select_lambda
 
 def transform(X: np.ndarray,
               client_id: int,
               seed: int,
               ppv_only: bool = True,
               caching: bool = True) -> np.ndarray:
-    # client_id is retained for API compatibility; dataset content is the key.
+    # client_id is retained for API compatibility, never used as data identity.
+    X = X.detach().cpu().numpy() if isinstance(X, torch.Tensor) else X
     return transform_features(X, [seed], ppv_only=ppv_only, caching=caching)
 
 
@@ -31,10 +32,9 @@ def transform_seeds(X: np.ndarray,
                     seeds: Iterable[int],
                     caching: bool = True,
                     use_torch: bool = False) -> Union[np.ndarray, torch.Tensor]:
-    if isinstance(X, torch.Tensor):
-        X = X.detach().cpu().numpy()
+    X = X.detach().cpu().numpy() if isinstance(X, torch.Tensor) else X
     Xnp = transform_features(X, seeds, caching=caching)
-    return torch.tensor(Xnp, dtype=torch.float32) if use_torch else Xnp
+    return torch.from_numpy(Xnp) if use_torch else Xnp
 
 
 class RidgeTorchModel(torch.nn.Module):

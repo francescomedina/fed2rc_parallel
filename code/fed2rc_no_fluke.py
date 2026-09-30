@@ -1,16 +1,3 @@
-import importlib.metadata
-_orig_dist = importlib.metadata.distribution
-
-def _safe_dist(name):
-    try:
-        return _orig_dist(name)
-    except importlib.metadata.PackageNotFoundError:
-        return _orig_dist(name.replace(".", "-"))
-
-importlib.metadata.distribution = _safe_dist
-importlib.metadata.version = lambda name: _safe_dist(name).version
-
-
 import numpy as np
 import pandas as pd
 import random
@@ -18,7 +5,6 @@ import wandb
 import argparse
 import itertools
 import os
-from time import perf_counter
 
 from sklearn.linear_model import RidgeClassifier
 from sktime.transformations.panel.rocket import Rocket
@@ -26,9 +12,9 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.linear_model import RidgeClassifierCV
 from sklearn.model_selection import train_test_split
-from utils import load_dataset, preprocess_data, split_function, RocketKernel, transform_seeds, transform_seeds_classic, select_lambda_classic, get_binary_dataset_names, get_three_classes_dataset_names, get_four_classes_dataset_names, get_multiclasses_dataset_names
+from utils import load_dataset, preprocess_data, split_function, RocketKernel, transform_seeds, get_binary_dataset_names, get_three_classes_dataset_names, get_four_classes_dataset_names, get_multiclasses_dataset_names
 from sklearn.preprocessing import LabelBinarizer
-from parallel_utils import select_lambda
+from openmp_utils import select_lambda
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--clients', type=int, default=4, help='Choose the number of parties of the federation')
@@ -36,10 +22,8 @@ parser.add_argument('-k', '--kernels', type=int, default=100, help='Choose the n
 parser.add_argument('-r', '--rounds', type=int, default=100, help='Choose the number of rounds of federated training')
 parser.add_argument('-v', '--validation', action='store_true', help='Choose this option to enable a grid search for the lambda regularizer on a validation set.')
 parser.add_argument('--debug', action='store_true', help='Use this option to disable WandB metrics tracking')
-parser.add_argument('--engine', choices=['parallel', 'classic'], default='parallel',
-                    help="'parallel' uses the Numba-threaded ROCKET transform (parallel_utils); "
-                         "'classic' uses the original pre-parallelization per-seed sktime loop, "
-                         "as a live serial baseline for accuracy/speed comparison.")
+parser.add_argument('--datasets', nargs='+', help='UCR dataset names (default: all)')
+parser.add_argument('--experiment-seeds', nargs='+', type=int, default=[1, 2, 3, 4, 5])
 args = parser.parse_args()
 
 # Constants
@@ -47,9 +31,7 @@ n_clients = args.clients
 n_kernels = args.kernels
 n_rounds = args.rounds
 top_k_per_client = (n_kernels * 1) // n_clients
-EXPERIMENT_SEEDS = [1,2,3,4,5]
-transform_fn = transform_seeds if args.engine == 'parallel' else transform_seeds_classic
-lambda_search_fn = select_lambda if args.engine == 'parallel' else select_lambda_classic
+EXPERIMENT_SEEDS = args.experiment_seeds
 
 def main():
     #list_of_datasets = get_binary_dataset_names()
@@ -57,7 +39,7 @@ def main():
     #list_of_datasets = get_four_classes_dataset_names()
     #list_of_datasets = get_multiclasses_dataset_names()
     #list_of_datasets = ['PigCVP'] #example
-    list_of_datasets = get_binary_dataset_names() + get_three_classes_dataset_names() + get_four_classes_dataset_names() + get_multiclasses_dataset_names()
+    list_of_datasets = args.datasets or (get_binary_dataset_names() + get_three_classes_dataset_names() + get_four_classes_dataset_names() + get_multiclasses_dataset_names())
 
     if args.debug:
         wandb.init(mode="disabled")
@@ -66,9 +48,10 @@ def main():
 
     # All the runs
     run_names = []
-    runs = wandb.Api().runs("mlgroup/Fed2RC")
-    for run in runs:
-        run_names.append(run.name)
+    if not args.debug:
+        runs = wandb.Api().runs("mlgroup/Fed2RC")
+        for run in runs:
+            run_names.append(run.name)
     #print("RUN NAMES DONE: ", run_names)
     wandb.finish()
 
@@ -86,9 +69,9 @@ def main():
             entity = "mlgroup"
             project = "Fed2RC"
             if args.validation:
-                run_name = f"VAL_{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS_{args.engine.upper()}"
+                run_name = f"VAL_{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS"
             else:
-                run_name = f"{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS_{args.engine.upper()}"
+                run_name = f"{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS"
             tags = ["Fed2RC"]
             if run_name in run_names:
                 print(f"Experiment {run_name} already executed.")
@@ -98,7 +81,6 @@ def main():
 
         for experiment_seed in EXPERIMENT_SEEDS:
             print('SEED', experiment_seed)
-            seed_start = perf_counter()
             rng = np.random.RandomState(experiment_seed)
             np.random.seed(experiment_seed)
             random.seed(experiment_seed)
@@ -128,6 +110,7 @@ def main():
             ts_length = len(X_train[0])
             n_classes = len(np.unique(Y_train))
 
+
             best_accuracy = 0
             best_seeds = None
             previous_seeds = 0
@@ -144,11 +127,8 @@ def main():
                     if args.validation:
                         x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.1, random_state=experiment_seed)
                     client_seeds = dict_seeds[client_id]
-                    x_trans = transform_fn(x_train, client_seeds, ts_length)
+                    x_trans = transform_seeds(x_train, client_seeds, ts_length)
                     model = RidgeClassifierCV(alphas=np.logspace(-3,0,100)).fit(x_trans, y_train)
-                    # coef_ is 1-D (n_features,) for binary targets and 2-D
-                    # (n_classes, n_features) otherwise; atleast_2d normalizes
-                    # both to a row so [0] always selects the full weight vector.
                     w = np.atleast_2d(model.coef_)[0]
                     train_acc = model.score(x_trans, y_train)
                     train_accuracies = np.concatenate([train_accuracies, [train_acc]])
@@ -184,7 +164,7 @@ def main():
             for client_id in range(n_clients):
                 x_train, y_train = s_X_train[client_id], s_Y_train[client_id]
                 client_seeds = dict_seeds[client_id]
-                x_trans = transform_fn(x_train, client_seeds, ts_length)  
+                x_trans = transform_seeds(x_train, client_seeds, ts_length)
                 y_onehot = np.eye(n_classes)[y_train]
                 A_local = x_trans.T @ x_trans
                 b_local = x_trans.T @ y_onehot
@@ -205,19 +185,18 @@ def main():
                 if args.validation:
                     _, x_val, _, y_val = train_test_split(x_train, y_train, test_size = 0.1, random_state=experiment_seed)
                 client_seeds = dict_seeds[client_id]
-                x_trans = transform_fn(x_train, client_seeds, ts_length)  
+                x_trans = transform_seeds(x_train, client_seeds, ts_length)
                 if args.validation:
-                    x_trans = transform_fn(x_val, client_seeds, ts_length)
+                    x_trans = transform_seeds(x_val, client_seeds, ts_length)
                 y_onehot = np.eye(n_classes)[y_train]
 
                 A_minus_client = A_global - A_locals[client_id]
                 b_minus_client = b_global - b_locals[client_id]
                 
-                tmp_lambda, best_accuracy, _ = lambda_search_fn(
+                tmp_lambda, best_accuracy, _ = select_lambda(
                     A_global if args.validation else A_minus_client,
                     b_global if args.validation else b_minus_client,
-                    x_trans,
-                    y_val if args.validation else y_train,
+                    x_trans, y_val if args.validation else y_train,
                     np.logspace(-3, 0, 100),
                 )
                 local_best_lambdas = np.concatenate([local_best_lambdas, [tmp_lambda * best_accuracy]])
@@ -226,7 +205,7 @@ def main():
             A_final = A_global + np.sum(local_best_lambdas)/np.sum(local_best_accs) * np.eye(A_global.shape[0])
             W_final = np.linalg.solve(A_final, b_global)
             W_final =  W_final / (np.linalg.norm(W_final, axis=0, keepdims=True) + 1e-10)
-            X_test_trans = transform_fn(X_test, round_selected_seeds, ts_length)
+            X_test_trans = transform_seeds(X_test, round_selected_seeds, ts_length)
             y_pred = np.argmax(X_test_trans @ W_final, axis=1)
             test_accuracy = accuracy_score(Y_test, y_pred)
             if n_classes == 2:
@@ -234,25 +213,20 @@ def main():
             else:
                 test_f1 = f1_score(Y_test, y_pred, average = 'macro')
 
-            seed_elapsed = perf_counter() - seed_start
-
-            print(f"Test Accuracy: {test_accuracy:.4f}, Test F1: {test_f1}, "
-                  f"Time: {seed_elapsed:.4f}s, Number of unique seeds: {n_kernels}")
+            print(f"Test Accuracy: {test_accuracy:.4f}, Test F1: {test_f1}, Number of unique seeds: {n_kernels}")
 
             if args.validation:
                 wandb.log({f'Test Accuracy using a regularizer coming from a validation set ({experiment_seed})': test_accuracy,
                             f'Test F1 using a regularizer coming from a validation set ({experiment_seed})': test_f1,
                             f'Validation Regularizer': np.sum(local_best_lambdas)/np.sum(local_best_accs),
                             f'Rounds': ({epoch}),
-                            f'Kernels': final_num_kernels,
-                            f'Time ({experiment_seed})': seed_elapsed})
+                            f'Kernels': final_num_kernels})
             else:
                 wandb.log({f'Test Accuracy ({experiment_seed})': test_accuracy,
                             f'Test F1 ({experiment_seed})': test_f1,
                             f'Validation Regularizer': np.sum(local_best_lambdas)/np.sum(local_best_accs),
                             f'Rounds': ({epoch}),
-                            f'Kernels': final_num_kernels,
-                            f'Time ({experiment_seed})': seed_elapsed})
+                            f'Kernels': final_num_kernels})
         wandb.finish()
 
 if __name__ == '__main__':
