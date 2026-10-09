@@ -1,0 +1,6 @@
+nohup: ignoring input
+Planned grid: 2 (clients, kernels) pairs x (1 classic baseline + 3 parallel thread counts) = 8 full-UCR-archive runs
+  clients=4 kernels=100 rounds=100: classic once, parallel at threads=[1, 2, 4]
+  clients=4 kernels=1000 rounds=100: classic once, parallel at threads=[1, 2, 4]
+
+>>> clients=4 kernels=100 engine=classic -> results/openmp_sweep/logs/c4_k100_classic.log

@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.linear_model import RidgeClassifierCV
 from sklearn.model_selection import train_test_split
-from utils import load_dataset, preprocess_data, split_function, RocketKernel, transform_seeds, get_binary_dataset_names, get_three_classes_dataset_names, get_four_classes_dataset_names, get_multiclasses_dataset_names
+from utils import load_dataset, preprocess_data, split_function, RocketKernel, transform_seeds, transform_seeds_classic, select_lambda_classic, get_binary_dataset_names, get_three_classes_dataset_names, get_four_classes_dataset_names, get_multiclasses_dataset_names
 from sklearn.preprocessing import LabelBinarizer
 from openmp_utils import select_lambda
 
@@ -24,6 +24,10 @@ parser.add_argument('-v', '--validation', action='store_true', help='Choose this
 parser.add_argument('--debug', action='store_true', help='Use this option to disable WandB metrics tracking')
 parser.add_argument('--datasets', nargs='+', help='UCR dataset names (default: all)')
 parser.add_argument('--experiment-seeds', nargs='+', type=int, default=[1, 2, 3, 4, 5])
+parser.add_argument('--engine', choices=['parallel', 'classic'], default='parallel',
+                    help="'parallel' uses the native OpenMP kernels (openmp_utils); "
+                         "'classic' uses the original pre-parallelization per-seed sktime "
+                         "loop and NumPy lambda loop, as a live serial baseline.")
 args = parser.parse_args()
 
 # Constants
@@ -32,8 +36,13 @@ n_kernels = args.kernels
 n_rounds = args.rounds
 top_k_per_client = (n_kernels * 1) // n_clients
 EXPERIMENT_SEEDS = args.experiment_seeds
+if args.engine == 'classic':
+    transform_seeds = transform_seeds_classic
+    select_lambda = select_lambda_classic
 
 def main():
+    # Imported here because tests/test_openmp.py executes main() on its own.
+    from time import perf_counter
     #list_of_datasets = get_binary_dataset_names()
     #list_of_datasets = get_three_classes_dataset_names()
     #list_of_datasets = get_four_classes_dataset_names()
@@ -69,9 +78,9 @@ def main():
             entity = "mlgroup"
             project = "Fed2RC"
             if args.validation:
-                run_name = f"VAL_{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS"
+                run_name = f"VAL_{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS_{args.engine.upper()}"
             else:
-                run_name = f"{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS"
+                run_name = f"{ds_name}_{n_kernels}KERNELS_{n_clients}CLIENTS_{args.engine.upper()}"
             tags = ["Fed2RC"]
             if run_name in run_names:
                 print(f"Experiment {run_name} already executed.")
@@ -81,6 +90,7 @@ def main():
 
         for experiment_seed in EXPERIMENT_SEEDS:
             print('SEED', experiment_seed)
+            seed_start = perf_counter()
             rng = np.random.RandomState(experiment_seed)
             np.random.seed(experiment_seed)
             random.seed(experiment_seed)
@@ -213,7 +223,10 @@ def main():
             else:
                 test_f1 = f1_score(Y_test, y_pred, average = 'macro')
 
-            print(f"Test Accuracy: {test_accuracy:.4f}, Test F1: {test_f1}, Number of unique seeds: {n_kernels}")
+            seed_elapsed = perf_counter() - seed_start
+
+            print(f"Test Accuracy: {test_accuracy:.4f}, Test F1: {test_f1}, "
+                  f"Time: {seed_elapsed:.4f}s, Number of unique seeds: {n_kernels}")
 
             if args.validation:
                 wandb.log({f'Test Accuracy using a regularizer coming from a validation set ({experiment_seed})': test_accuracy,
