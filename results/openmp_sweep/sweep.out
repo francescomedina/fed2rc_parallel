@@ -3,3 +3,46 @@ Planned grid: 2 (clients, kernels) pairs x (1 classic baseline + 3 parallel thre
   clients=4 kernels=1000 rounds=100: classic once, parallel at threads=[1, 2, 4]
 
 >>> clients=4 kernels=100 engine=classic -> results/openmp_sweep/logs/c4_k100_classic.log
+    finished in 22437.1s (returncode=0)
+
+>>> clients=4 kernels=100 engine=parallel threads=1 -> results/openmp_sweep/logs/c4_k100_parallel_t1.log
+    finished in 14633.9s (returncode=0)
+    accuracy match vs classic: True (128/128 datasets, mean|acc diff|=0.0001), speedup=1.53x, time=14633.9s (classic=22437.1s)
+
+>>> clients=4 kernels=100 engine=parallel threads=2 -> results/openmp_sweep/logs/c4_k100_parallel_t2.log
+    finished in 13867.3s (returncode=0)
+    accuracy match vs classic: True (128/128 datasets, mean|acc diff|=0.0001), speedup=1.62x, time=13867.3s (classic=22437.1s)
+
+>>> clients=4 kernels=100 engine=parallel threads=4 -> results/openmp_sweep/logs/c4_k100_parallel_t4.log
+    finished in 14517.7s (returncode=0)
+    accuracy match vs classic: True (128/128 datasets, mean|acc diff|=0.0001), speedup=1.55x, time=14517.7s (classic=22437.1s)
+
+>>> clients=4 kernels=1000 engine=classic -> results/openmp_sweep/logs/c4_k1000_classic.log
+    finished in 96508.5s (returncode=0)
+
+>>> clients=4 kernels=1000 engine=parallel threads=1 -> results/openmp_sweep/logs/c4_k1000_parallel_t1.log
+    finished in 23436.7s (returncode=0)
+    accuracy match vs classic: True (128/128 datasets, mean|acc diff|=0.0002), speedup=4.12x, time=23436.7s (classic=96508.5s)
+
+>>> clients=4 kernels=1000 engine=parallel threads=2 -> results/openmp_sweep/logs/c4_k1000_parallel_t2.log
+    finished in 19720.4s (returncode=0)
+    accuracy match vs classic: True (128/128 datasets, mean|acc diff|=0.0002), speedup=4.90x, time=19720.4s (classic=96508.5s)
+
+>>> clients=4 kernels=1000 engine=parallel threads=4 -> results/openmp_sweep/logs/c4_k1000_parallel_t4.log
+    finished in 18921.3s (returncode=0)
+    accuracy match vs classic: True (128/128 datasets, mean|acc diff|=0.0002), speedup=5.11x, time=18921.3s (classic=96508.5s)
+Wrote /home/sciandra/projs/fed2rc_parallel/results/openmp_sweep/sweep_results.png and .svg
+  clients=4 kernels=100: classic=22437.1s
+    threads=1: 14633.9s (speedup 1.53x)  match=True
+    threads=2: 13867.3s (speedup 1.62x)  match=True
+    threads=4: 14517.7s (speedup 1.55x)  match=True
+  clients=4 kernels=1000: classic=96508.5s
+    threads=1: 23436.7s (speedup 4.12x)  match=True
+    threads=2: 19720.4s (speedup 4.89x)  match=True
+    threads=4: 18921.3s (speedup 5.10x)  match=True
+
+Completed: 8/8  Failed: 0
+ACCURACY MATCHES CLASSIC: True
+SPEEDUP WITH THREADS: True
+BEATS CLASSIC: True
+PARALLEL SPEEDUP WITH MATCHING ACCURACY: True
