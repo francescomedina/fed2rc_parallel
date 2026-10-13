@@ -1,0 +1,401 @@
+DATASET BeetleFly
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5168
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5072
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5071
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5071
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9500, Test F1: 0.9473684210526315, Time: 1739.0281s, Number of unique seeds: 10000
+SEED 2
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5694
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5657
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5657
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9500, Test F1: 0.9473684210526315, Time: 1998.5862s, Number of unique seeds: 10000
+SEED 3
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5752
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5734
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5734
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9500, Test F1: 0.9473684210526315, Time: 2003.4870s, Number of unique seeds: 10000
+SEED 4
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5100
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5039
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5039
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9500, Test F1: 0.9473684210526315, Time: 1627.6745s, Number of unique seeds: 10000
+SEED 5
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5373
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5266
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5266
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9500, Test F1: 0.9473684210526315, Time: 1741.9958s, Number of unique seeds: 10000
+DATASET BirdChicken
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5562
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5509
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5509
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.8500, Test F1: 0.8571428571428571, Time: 1947.0524s, Number of unique seeds: 10000
+SEED 2
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5743
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5705
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5705
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9000, Test F1: 0.9090909090909091, Time: 2051.8152s, Number of unique seeds: 10000
+SEED 3
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5708
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5663
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5663
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9000, Test F1: 0.9090909090909091, Time: 2040.7173s, Number of unique seeds: 10000
+SEED 4
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5762
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5739
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5738
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5738
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9000, Test F1: 0.9090909090909091, Time: 2185.1358s, Number of unique seeds: 10000
+SEED 5
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5317
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5222
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5222
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9000, Test F1: 0.9090909090909091, Time: 1775.2691s, Number of unique seeds: 10000
+DATASET Chinatown
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5832
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5776
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5775
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5775
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9854, Test F1: 0.9898580121703854, Time: 2177.7170s, Number of unique seeds: 10000
+SEED 2
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5800
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5736
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5736
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9854, Test F1: 0.9898580121703854, Time: 2030.1830s, Number of unique seeds: 10000
+SEED 3
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5912
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5823
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5822
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5822
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9854, Test F1: 0.9898580121703854, Time: 2178.4726s, Number of unique seeds: 10000
+SEED 4
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6016
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5942
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5942
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9854, Test F1: 0.9898580121703854, Time: 2138.9050s, Number of unique seeds: 10000
+SEED 5
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6357
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6254
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6243
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6241
+
+=== Round 6 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6235
+
+=== Round 7 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6232
+
+=== Round 8 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6229
+
+=== Round 9 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6227
+
+=== Round 10 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6227
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.9854, Test F1: 0.9898580121703854, Time: 3026.7011s, Number of unique seeds: 10000
+DATASET Coffee
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5709
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5667
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5667
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 1.0000, Test F1: 1.0, Time: 2081.5064s, Number of unique seeds: 10000
+SEED 2
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5510
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5467
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5467
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 1.0000, Test F1: 1.0, Time: 1944.6053s, Number of unique seeds: 10000
+SEED 3
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5560
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5523
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5522
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5522
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 1.0000, Test F1: 1.0, Time: 2076.0992s, Number of unique seeds: 10000
+SEED 4
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5440
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5371
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5371
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 1.0000, Test F1: 1.0, Time: 1869.7828s, Number of unique seeds: 10000
+SEED 5
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5763
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5717
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 5717
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 1.0000, Test F1: 1.0, Time: 2073.5398s, Number of unique seeds: 10000
+DATASET Computers
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6245
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6123
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6122
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6122
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7680, Test F1: 0.7751937984496124, Time: 2553.4721s, Number of unique seeds: 10000
+SEED 2
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6374
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6209
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6200
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6198
+
+=== Round 6 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6198
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7400, Test F1: 0.7450980392156863, Time: 2709.5528s, Number of unique seeds: 10000
+SEED 3
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6382
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6230
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6219
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6219
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7560, Test F1: 0.7607843137254902, Time: 2617.5006s, Number of unique seeds: 10000
+SEED 4
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6274
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6151
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6143
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6142
+
+=== Round 6 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6142
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7640, Test F1: 0.766798418972332, Time: 2687.1297s, Number of unique seeds: 10000
+SEED 5
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6393
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6288
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6279
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6278
+
+=== Round 6 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6276
+
+=== Round 7 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6276
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7440, Test F1: 0.7480314960629921, Time: 2897.0497s, Number of unique seeds: 10000
+DATASET DistalPhalanxOutlineCorrect
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6360
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6255
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6248
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6248
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7681, Test F1: 0.8181818181818182, Time: 2596.4325s, Number of unique seeds: 10000
+SEED 2
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6374
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6259
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6250
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6250
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7572, Test F1: 0.8091168091168092, Time: 2617.4862s, Number of unique seeds: 10000
+SEED 3
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6370
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6267
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6254
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6252
+
+=== Round 6 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6252
+
+ Convergence achieved: Seeds unchanged for 2 consecutive epochs. Training terminated.
+Test Accuracy: 0.7645, Test F1: 0.8148148148148148, Time: 2736.5294s, Number of unique seeds: 10000
+SEED 4
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 10000
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6331
+
+=== Round 3 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6209
+
+=== Round 4 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6200
+
+=== Round 5 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 6200
