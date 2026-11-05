@@ -24,10 +24,10 @@ class RocketKernel:
 
         return X_transformed
 
-def transform_seeds(X, seeds, ts_length):
+def transform_seeds(X, seeds, ts_length, *, temporal_chunks=1):
     if np.asarray(X).shape[-1] != ts_length:
         raise ValueError("ts_length must match the input series length")
-    return transform_features(X, seeds)
+    return transform_features(X, seeds, temporal_chunks=temporal_chunks)
 
 def transform_seeds_classic(X, seeds, ts_length):
     # Pre-parallelization implementation (git rev 209009c): one sktime Rocket

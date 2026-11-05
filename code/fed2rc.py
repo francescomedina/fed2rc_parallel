@@ -21,19 +21,20 @@ def transform(X: np.ndarray,
               client_id: int,
               seed: int,
               ppv_only: bool = True,
-              caching: bool = True) -> np.ndarray:
+              caching: bool = True, *, temporal_chunks=1) -> np.ndarray:
     # client_id is retained for API compatibility, never used as data identity.
     X = X.detach().cpu().numpy() if isinstance(X, torch.Tensor) else X
-    return transform_features(X, [seed], ppv_only=ppv_only, caching=caching)
+    return transform_features(X, [seed], ppv_only=ppv_only, caching=caching,
+                              temporal_chunks=temporal_chunks)
 
 
 def transform_seeds(X: np.ndarray,
                     client_id: int,
                     seeds: Iterable[int],
                     caching: bool = True,
-                    use_torch: bool = False) -> Union[np.ndarray, torch.Tensor]:
+                    use_torch: bool = False, *, temporal_chunks=1) -> Union[np.ndarray, torch.Tensor]:
     X = X.detach().cpu().numpy() if isinstance(X, torch.Tensor) else X
-    Xnp = transform_features(X, seeds, caching=caching)
+    Xnp = transform_features(X, seeds, caching=caching, temporal_chunks=temporal_chunks)
     return torch.from_numpy(Xnp) if use_torch else Xnp
 
 

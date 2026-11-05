@@ -59,3 +59,6 @@ The results directory reports the accuracy and F1-score metrics for all datasets
 
 See [OPENMP.md](OPENMP.md) for build instructions, numerical regression tests,
 and the shared-memory C++ implementation of ROCKET transforms and lambda search.
+
+See [TEMPORAL.md](TEMPORAL.md) for optional intra-series temporal partitioning
+in both Numba and C++/OpenMP, correctness tests, and reproducible benchmarks.

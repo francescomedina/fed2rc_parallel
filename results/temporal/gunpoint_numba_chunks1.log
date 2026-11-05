@@ -1,0 +1,7 @@
+DATASET GunPoint
+SEED 1
+
+=== Round 1 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 32
+
+=== Round 2 ===, Mean Train Accuracy: 1.0000, Number of unique seeds: 22
+Test Accuracy: 0.9800, Test F1: 0.9795918367346939, Time: 3.2206s, Number of unique seeds: 32

@@ -38,7 +38,7 @@ compile_args += shlex.split(os.environ.get("FED2RC_CXXFLAGS", ""))
 setup(
     name="fed2rc-openmp",
     version="0.1.0",
-    py_modules=["openmp_utils"],
+    py_modules=["openmp_utils", "parallel_utils", "temporal"],
     package_dir={"": "code"},
     ext_modules=[Pybind11Extension(
         "_fed2rc_openmp", ["native/bindings.cpp"], cxx_std=17,

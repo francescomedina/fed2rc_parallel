@@ -5,6 +5,8 @@ import wandb
 import argparse
 import itertools
 import os
+from functools import partial
+from temporal import validate_temporal_chunks
 
 from sklearn.linear_model import RidgeClassifier
 from sktime.transformations.panel.rocket import Rocket
@@ -24,11 +26,16 @@ parser.add_argument('-v', '--validation', action='store_true', help='Choose this
 parser.add_argument('--debug', action='store_true', help='Use this option to disable WandB metrics tracking')
 parser.add_argument('--datasets', nargs='+', help='UCR dataset names (default: all)')
 parser.add_argument('--experiment-seeds', nargs='+', type=int, default=[1, 2, 3, 4, 5])
-parser.add_argument('--engine', choices=['parallel', 'classic'], default='parallel',
+parser.add_argument('--engine', choices=['parallel', 'classic', 'numba'], default='parallel',
                     help="'parallel' uses the native OpenMP kernels (openmp_utils); "
                          "'classic' uses the original pre-parallelization per-seed sktime "
-                         "loop and NumPy lambda loop, as a live serial baseline.")
+                         "loop and NumPy lambda loop; 'numba' uses the comparison implementation.")
+parser.add_argument('--temporal-chunks', default=1,
+                    type=lambda value: validate_temporal_chunks(value if value == 'auto' else int(value)),
+                    help="Convolution output partitions: 1 (original), 2, 4, N, or auto")
 args = parser.parse_args()
+if args.engine == 'classic' and args.temporal_chunks != 1:
+    parser.error('--temporal-chunks requires --engine parallel or numba')
 
 # Constants
 n_clients = args.clients
@@ -39,6 +46,15 @@ EXPERIMENT_SEEDS = args.experiment_seeds
 if args.engine == 'classic':
     transform_seeds = transform_seeds_classic
     select_lambda = select_lambda_classic
+elif args.engine == 'numba':
+    from parallel_utils import transform_features as numba_transform, select_lambda
+
+    def transform_seeds(X, seeds, ts_length):
+        if np.asarray(X).shape[-1] != ts_length:
+            raise ValueError('ts_length must match the input series length')
+        return numba_transform(X, seeds, temporal_chunks=args.temporal_chunks)
+else:
+    transform_seeds = partial(transform_seeds, temporal_chunks=args.temporal_chunks)
 
 def main():
     # Imported here because tests/test_openmp.py executes main() on its own.
