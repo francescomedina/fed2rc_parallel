@@ -35,3 +35,13 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## Optional PLASMA two-stage solver
+
+`native/twostage_plasma.c` adapts PLASMA's
+`zheevd.c`, `pzunmqr_blgtrd.c` and `pzhbtrd_static.c` (double precision),
+revision `548e0bdc5a046a728770bccf14503c37732c80fc`.
+Copyright 2008–2016 University of Tennessee, Innovative Computing Laboratory.
+BSD-3-Clause: [full notice](third_party/PLASMA_LICENSE.txt).
+The adapter corrects right-side reflector traversal and uses release/acquire
+wavefront progress signals on ARM. Upstream: https://github.com/icl-utk-edu/plasma .

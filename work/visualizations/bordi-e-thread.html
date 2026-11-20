@@ -1,0 +1,138 @@
+<div id="rocket-bordi-thread" aria-label="Filtro ai bordi e distribuzione del lavoro tra quattro thread">
+  <style>
+    #rocket-bordi-thread { display: grid; gap: calc(var(--font-size-base) * 1.6); color: var(--foreground); }
+    #rocket-bordi-thread section { display: grid; gap: calc(var(--font-size-base) * .65); min-width: 0; }
+    #rocket-bordi-thread .tap-row { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: calc(var(--font-size-base) * .12); }
+    #rocket-bordi-thread .tap { display: grid; gap: calc(var(--font-size-base) * .35); min-width: 0; text-align: center; }
+    #rocket-bordi-thread .sample { display: block; padding: calc(var(--font-size-base) * .65) 0; color: var(--foreground); background: color-mix(in srgb, var(--viz-series-1) 20%, var(--background)); }
+    #rocket-bordi-thread .sample.padding { background: var(--muted); color: var(--muted-foreground); }
+    #rocket-bordi-thread .legend { display: flex; flex-wrap: wrap; gap: calc(var(--font-size-base) * 1.1); }
+    #rocket-bordi-thread .legend-item { display: inline-flex; align-items: center; gap: calc(var(--font-size-base) * .35); }
+    #rocket-bordi-thread .swatch { display: inline-block; width: calc(var(--font-size-base) * .8); height: calc(var(--font-size-base) * .8); background: color-mix(in srgb, var(--viz-series-1) 20%, var(--background)); }
+    #rocket-bordi-thread .swatch.padding { background: var(--muted); }
+    #rocket-bordi-thread .assignment { display: flex; gap: calc(var(--font-size-base) * .4); align-items: start; }
+    #rocket-bordi-thread .worker { display: grid; gap: calc(var(--font-size-base) * .4); min-width: 0; text-align: center; }
+    #rocket-bordi-thread .outputs { display: grid; gap: 2px; }
+    #rocket-bordi-thread .output { height: calc(var(--font-size-base) * 1.2); background: var(--worker-color); }
+    #rocket-bordi-thread .cost { display: grid; gap: calc(var(--font-size-base) * .1); }
+    #rocket-bordi-thread .total { display: flex; flex-wrap: wrap; gap: calc(var(--font-size-base) * .8); }
+  </style>
+
+  <section aria-labelledby="rocket-border-title">
+    <h3 id="rocket-border-title">1. Lo stesso filtro: al bordo o al centro</h3>
+    <div class="text-small">32 campioni · 11 coefficienti · dilatazione 2</div>
+    <div class="viz-controls" role="group" aria-label="Posizione del filtro">
+      <button class="btn" type="button" aria-pressed="true" data-position="edge">Al bordo</button>
+      <button class="btn" type="button" aria-pressed="false" data-position="middle">Al centro</button>
+    </div>
+    <div class="tap-row" id="rocket-taps" role="img" aria-label="Undici coefficienti del filtro"></div>
+    <div class="legend text-small">
+      <span class="legend-item"><span class="swatch" aria-hidden="true"></span>Campione reale x</span>
+      <span class="legend-item"><span class="swatch padding" aria-hidden="true"></span>Zero di padding</span>
+      <span>w = coefficiente del filtro</span>
+    </div>
+    <div id="rocket-valid-count" class="tabular-nums" aria-live="polite"></div>
+  </section>
+
+  <section aria-labelledby="rocket-uniform-title">
+    <h3 id="rocket-uniform-title">2. Divisione uniforme: 8 risposte per thread</h3>
+    <div class="assignment" id="rocket-uniform" role="img" aria-label="Quattro thread con otto risposte ciascuno; lavoro di 60, 86, 86 e 60 prodotti"></div>
+    <div class="text-small">Ogni quadratino = una risposta della convoluzione.</div>
+  </section>
+
+  <section aria-labelledby="rocket-balanced-title">
+    <h3 id="rocket-balanced-title">3. Proposta: più risposte nei blocchi meno costosi</h3>
+    <div class="assignment" id="rocket-balanced" role="img" aria-label="Quattro thread con 9, 7, 7 e 9 risposte; lavoro di 70, 76, 76 e 70 prodotti"></div>
+    <div class="total tabular-nums"><span>Stesso totale: 32 risposte</span><span>292 prodotti validi</span></div>
+  </section>
+
+  <script>
+    (() => {
+      const root = document.getElementById('rocket-bordi-thread');
+      const taps = root.querySelector('#rocket-taps');
+      const count = root.querySelector('#rocket-valid-count');
+      const buttons = [...root.querySelectorAll('[data-position]')];
+      const subscripts = '₀₁₂₃₄₅₆₇₈₉';
+      const sub = n => String(n).split('').map(c => subscripts[Number(c)]).join('');
+
+      function showFilter(position) {
+        const start = position === 'middle' ? 5 : -10;
+        let valid = 0;
+        taps.replaceChildren();
+        for (let j = 0; j < 11; j++) {
+          const index = start + j * 2;
+          const inside = index >= 0 && index < 32;
+          if (inside) valid++;
+          const tap = document.createElement('div');
+          tap.className = 'tap';
+          const sample = document.createElement('span');
+          sample.className = inside ? 'sample' : 'sample padding';
+          sample.textContent = inside ? 'x' + sub(index) : '0';
+          const weight = document.createElement('span');
+          weight.className = 'text-small';
+          weight.textContent = 'w' + sub(j);
+          tap.append(sample, weight);
+          taps.append(tap);
+        }
+        taps.setAttribute('aria-label', `${valid} campioni reali, ${11-valid} zeri di padding, undici coefficienti distanziati di due campioni`);
+        count.textContent = `${valid} campioni reali · ${11-valid} zeri di padding`;
+        buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.position === position)));
+      }
+
+      function assignment(id, sizes, products) {
+        const target = root.querySelector(id);
+        sizes.forEach((size, i) => {
+          const worker = document.createElement('div');
+          worker.className = 'worker';
+          worker.style.flex = String(size) + ' 1 0';
+          worker.style.setProperty('--worker-color', `var(--viz-series-${i+1})`);
+          const name = document.createElement('span');
+          name.textContent = `Thread ${i+1}`;
+          const output = document.createElement('div');
+          output.className = 'outputs';
+          output.style.gridTemplateColumns = `repeat(${size}, minmax(0, 1fr))`;
+          output.setAttribute('aria-hidden', 'true');
+          for (let q = 0; q < size; q++) {
+            const mark = document.createElement('span');
+            mark.className = 'output';
+            output.append(mark);
+          }
+          const amount = document.createElement('span');
+          amount.className = 'text-small tabular-nums';
+          amount.textContent = `${size} risposte`;
+          const cost = document.createElement('div');
+          cost.className = 'cost tabular-nums';
+          const number = document.createElement('span');
+          number.textContent = String(products[i]);
+          const label = document.createElement('span');
+          label.className = 'text-small';
+          label.textContent = 'prodotti';
+          cost.append(number, label);
+          worker.append(name, output, amount, cost);
+          target.append(worker);
+        });
+      }
+
+      showFilter('edge');
+      assignment('#rocket-uniform', [8,8,8,8], [60,86,86,60]);
+      assignment('#rocket-balanced', [9,7,7,9], [70,76,76,70]);
+
+      function restore(state) {
+        if (state && state.modelContent && ['edge','middle'].includes(state.modelContent.position)) {
+          showFilter(state.modelContent.position);
+        }
+      }
+      restore(window.openai && window.openai.widgetState);
+      window.addEventListener('openai:set_globals', event => {
+        restore(event.detail && event.detail.globals && event.detail.globals.widgetState);
+      });
+      buttons.forEach(button => button.addEventListener('click', () => {
+        const position = button.dataset.position;
+        showFilter(position);
+        if (window.openai && window.openai.setWidgetState) {
+          window.openai.setWidgetState({modelContent:{position},privateContent:null}).catch(() => {});
+        }
+      }));
+    })();
+  </script>
+</div>

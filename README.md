@@ -62,3 +62,28 @@ and the shared-memory C++ implementation of ROCKET transforms and lambda search.
 
 See [TEMPORAL.md](TEMPORAL.md) for optional intra-series temporal partitioning
 in both Numba and C++/OpenMP, correctness tests, and reproducible benchmarks.
+
+## Optional two-stage lambda solver
+
+`two_stage` reduces the symmetric Gram matrix to band form and then to
+tridiagonal form with parallel bulge chasing. It also transforms `b` and the
+validation features, reusing the reduction for all lambda candidates. The
+default LU solver and ROCKET transform are unchanged.
+
+Requires CMake, an OpenMP C/C++ compiler (Homebrew LLVM on macOS), OpenBLAS
+with LAPACKE, and pybind11. PLASMA is pinned and built locally under `build/`.
+
+```sh
+.venv/bin/python build_twostage.py
+NUMBA_NUM_THREADS=4 OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 .venv/bin/python -m pytest tests -q
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=1 .venv/bin/python benchmark_twostage.py
+cd code
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=1 ../.venv/bin/python fed2rc_no_fluke.py --engine parallel --lambda-solver two_stage --debug --datasets GunPoint
+```
+
+Python: `select_lambda(A, b, X, y, lambdas, threads=8, solver="two_stage")`.
+Tile width is fixed at 64 and inner block size at 16. The method helps large
+feature matrices with many lambda candidates; small workloads can be slower.
+It uses more workspace than a one-stage reduction. Concurrent preparations are
+serialized because PLASMA has a global context. Buffers must stay immutable
+during calls. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution.

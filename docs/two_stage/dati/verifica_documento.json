@@ -1,0 +1,12 @@
+{
+  "pages": 33,
+  "numbered_color_figures": 30,
+  "benchmark_configurations": 136,
+  "repeats_per_method": 5,
+  "timed_api_calls": 1360,
+  "correctness_tests": 296,
+  "production_code_unchanged": true,
+  "pdf_sha256": "2962f2499996b572486432e19bd9794846ca5723324b831e7aa14abaa0c6a5f4",
+  "timing_scope": "full API on prepared float64 inputs",
+  "diagrams": "TikZ vector; Gantt is an explicitly labelled unit-cost simulation"
+}

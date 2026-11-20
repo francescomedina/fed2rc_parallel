@@ -1,0 +1,1065 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{lmodern,microtype}
+\usepackage[margin=2.05cm,headheight=15pt]{geometry}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{xcolor,graphicx,float,booktabs,array,tabularx}
+\usepackage{tikz,pgfplots}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,matrix,backgrounds,decorations.pathreplacing,patterns,shapes.geometric,graphs}
+\pgfplotsset{compat=1.18}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{enumitem,fancyhdr}
+\usepackage{xurl,hyperref}
+\definecolor{Ink}{HTML}{17324D}
+\definecolor{Blue}{HTML}{1768AC}
+\definecolor{Teal}{HTML}{008C95}
+\definecolor{Orange}{HTML}{D97812}
+\definecolor{Purple}{HTML}{8157B5}
+\definecolor{Coral}{HTML}{D64C52}
+\definecolor{Green}{HTML}{22845E}
+\definecolor{Paper}{HTML}{F3F7FB}
+\colorlet{P0}{Blue}\colorlet{P1}{Orange}\colorlet{P2}{Purple}\colorlet{P3}{Green}
+\hypersetup{colorlinks=true,linkcolor=Blue,urlcolor=Teal,citecolor=Purple,pdftitle={Riduzione a due stadi per Fed2RC: matematica, bordi e parallelismo},pdfauthor={Documentazione tecnica del progetto Fed2RC parallel}}
+\pagestyle{fancy}\fancyhf{}\fancyhead[L]{\small\color{Ink}Fed2RC\;|\;Riduzione a due stadi}\fancyhead[R]{\small\color{Teal}Matematica e parallelismo}\fancyfoot[C]{\color{Ink}\thepage}
+\setlength{\parindent}{0pt}\setlength{\parskip}{5.5pt}
+\setlist{itemsep=2pt,topsep=3pt,leftmargin=*}
+\newtcolorbox{idea}[1][]{enhanced,colback=Blue!4,colframe=Blue!65!black,boxrule=.6pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm,#1}
+\newtcolorbox{attenzione}[1][]{enhanced,colback=Orange!6,colframe=Orange!80!black,boxrule=.6pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm,#1}
+\newcommand{\semplice}[1]{\begin{idea}[title=In parole semplici]#1\end{idea}}
+\newcommand{\mat}[1]{\bm{#1}}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\cod}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\page}[1]{\clearpage\section{#1}}
+\newcommand{\threadlegend}{\tikz[baseline=-.6ex]{\foreach \p in {0,1,2,3}{\fill[P\p] (\p*1.8,0) rectangle ++(.24,.17);\node[anchor=west,font=\scriptsize] at (\p*1.8+.3,.085){thread P\p};}}}
+\tikzset{box/.style={rounded corners=2mm,draw=Blue!65,fill=Blue!8,align=center,minimum height=10mm,text=Ink,font=\small},arr/.style={-{Latex[length=2.2mm]},thick,draw=Ink!75},task/.style={box,minimum width=17mm,minimum height=8mm},note/.style={align=left,font=\small,text=Ink}}
+\lstdefinestyle{term}{basicstyle=\ttfamily\scriptsize,backgroundcolor=\color{Paper},frame=single,rulecolor=\color{Blue!35},breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,upquote=true,xleftmargin=2mm,xrightmargin=2mm,aboveskip=5pt,belowskip=5pt}
+\lstset{style=term,keywordstyle=\color{Blue}\bfseries,commentstyle=\color{Teal!80!black},stringstyle=\color{Purple}}
+\input{dati/esempio_numerico.tex}
+\input{dati/soglie_tabella.tex}
+\input{dati/cento_tabella.tex}
+\begin{document}
+\begin{titlepage}
+\begin{tikzpicture}[remember picture,overlay]
+\fill[Ink] (current page.north west) rectangle ([yshift=-7.9cm]current page.north east);
+\fill[Teal] ([yshift=-7.9cm]current page.north west) rectangle ([yshift=-8.08cm]current page.north east);
+\node[anchor=north west,text=white,text width=16.8cm] at ([xshift=2.05cm,yshift=-1.7cm]current page.north west) {\Huge\bfseries Fed2RC:\\riduzione a due stadi\\per la ricerca dei lambda\\[5mm]\Large Matematica equivalente, bordi e thread};
+\end{tikzpicture}
+\par\vspace*{6.8cm}
+{\Large\color{Teal}\bfseries Una guida scientifica, con spiegazioni semplici}\par
+\vspace{6mm}
+\begin{tikzpicture}[>=Latex]
+\node[box,minimum width=3.4cm,fill=Blue!12] (a) at (0,0) {matrice piena\\$A$};
+\node[box,minimum width=3.4cm,fill=Orange!15,draw=Orange] (b) at (5,0) {matrice a banda\\$B$};
+\node[box,minimum width=3.4cm,fill=Teal!15,draw=Teal] (t) at (10,0) {tridiagonale\\$T$};
+\draw[arr] (a)--node[above,font=\small]{$Q_1$}(b);\draw[arr] (b)--node[above,font=\small]{$Q_2$}(t);
+\end{tikzpicture}
+\vspace{5mm}
+\begin{idea}[title=Il risultato da ricordare]
+\[
+\boxed{\;(A+\lambda I)W_\lambda=b\quad\Longleftrightarrow\quad
+(T+\lambda I)U_\lambda=Q^{\T}b,\qquad W_\lambda=Q U_\lambda\;}
+\]
+Prepariamo una rappresentazione equivalente una volta per chiamata, poi la
+riutilizziamo per tutti i candidati. I thread coordinano gli aggiornamenti
+locali attraverso dipendenze e segnali di completamento.
+\end{idea}
+\vfill
+{\small\raggedright
+\textbf{Versione documentata:} implementazione minima rispetto al commit\\
+\cod{e61a33c15d329a5ec21f8ce85cfa5fbb3a377658}.\\
+\textbf{Dipendenza:} PLASMA, revisione\\
+\cod{548e0bdc5a046a728770bccf14503c37732c80fc}.\\
+\textbf{Misure:} CPU Apple M1 Pro, nuova scansione della versione minima;
+20 novembre 2026. Dati e sorgenti delle figure sono allegati.\\
+\textbf{Tecnologie del documento:} TikZ/PGF per i grafi vettoriali, PGFPlots
+per i grafici, AMSMath/Mathtools per le formule. Tutte le figure sono a colori.\par}
+\end{titlepage}
+\tableofcontents
+\begin{idea}[title=Come leggere il documento]
+Il testo alterna formule verificabili e riquadri intuitivi. Le figure di
+matrici piccole sono esempi didattici; il DAG segue le formule del codice.
+Il diagramma temporale è una simulazione a costo unitario. I grafici dei tempi,
+invece, contengono esecuzioni realmente misurate. Queste categorie sono sempre distinte.
+\end{idea}
+\page{Il problema: che cosa stiamo calcolando?}
+Le serie temporali diventano vettori di feature attraverso ROCKET. Nel
+percorso Fed2RC qui usato si conserva una feature PPV per kernel selezionato.
+Indichiamo con $d$ il numero \emph{finale} di feature, con $c$ le classi,
+con $n$ gli esempi di addestramento e con $m$ quelli della validazione.
+\[
+Z\in\R^{n\times d},\quad Y\in\R^{n\times c},\quad
+A=Z^{\T}Z\in\R^{d\times d},\quad b=Z^{\T}Y\in\R^{d\times c}.
+\]
+Nel caso federato le contribuzioni vengono sommate; nella validazione che
+esclude un client si sottrae la sua contribuzione. La matrice usata dal
+solver cambia quindi fra chiamate.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=10mm and 9mm]
+\foreach \i/\x/\co in {0/0/Blue,1/4.5/Orange,2/9/Purple}{
+\node[box,fill=\co!12,draw=\co,minimum width=3.5cm] (c\i) at (\x,0) {client \i: feature $Z_\i$\\$A_\i=Z_\i^{\T}Z_\i$, $b_\i=Z_\i^{\T}Y_\i$};}
+\node[box,fill=Teal!12,draw=Teal,minimum width=6cm] (agg) at (4.5,-2) {problema gi\`a disponibile al solver\\$A=\sum_j A_j$,\quad $b=\sum_j b_j$};
+\foreach \i in {0,1,2}\draw[arr] (c\i)--(agg);
+\node[box,below=of agg,minimum width=6cm] (cv) {provare $L$ candidati $\lambda$ e scegliere il migliore};
+\draw[arr] (agg)--(cv);
+\end{tikzpicture}
+\caption{Collocazione del metodo. Lo schema illustra le contribuzioni algebriche; non aggiunge messaggi al protocollo federato esistente.}
+\end{figure}
+\begin{center}\small
+\begin{tabularx}{\linewidth}{lXl}\toprule
+Simbolo&Significato&Dimensione\\\midrule
+$A$&matrice di Gram simmetrica&$d\times d$\\
+$b$&termini noti, una colonna per classe&$d\times c$\\
+$X$&feature di validazione&$m\times d$\\
+$L$&numero di valori di lambda da confrontare&scalare\\
+$P$&budget di thread OpenMP&scalare\\\bottomrule
+\end{tabularx}\end{center}
+\semplice{Con 900 feature, $A$ è una tabella $900\times900$. Con 100 lambda,
+si devono risolvere 100 problemi molto simili su quella tabella. Il numero
+di feature non è il numero di esempi e non coincide sempre con i kernel iniziali.}
+\page{La formula originale e il costo ripetuto}
+Il sistema ridge deriva dal problema
+\begin{align}
+\min_W\quad&\norm{ZW-Y}_F^2+\lambda\norm{W}_F^2,\\
+\nabla_W=0\quad&\Longrightarrow\quad
+\underbrace{(Z^{\T}Z+\lambda I)}_{A+\lambda I}W_\lambda=Z^{\T}Y=b.
+\end{align}
+$\lambda>0$ regola quanto si penalizzano pesi grandi. Il programma valuta
+100 candidati logaritmicamente spaziati fra $10^{-3}$ e $1$ per ogni ricerca.
+La baseline attuale usa LU con pivoting per ciascun candidato.
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,minimum width=2cm] (a) at (0,0) {$A,b,X$};
+\foreach \i/\yy/\col in {1/1.6/Blue,2/0/Orange,3/-1.6/Purple}{
+\node[box,fill=\col!12,draw=\col,minimum width=3cm] (m\i) at (4,\yy) {$A+\lambda_\i I$};
+\node[box,fill=\col!12,draw=\col,minimum width=3cm] (f\i) at (8.1,\yy) {LU e soluzione\\pesi e predizione};
+\draw[arr] (a)--(m\i);\draw[arr] (m\i)--(f\i);}
+\node[font=\small,text=Coral,align=center] at (8.1,-2.8) {fattorizzazione densa ripetuta\\per ogni candidato};
+\end{tikzpicture}
+\caption{Il parallelismo fra lambda è già presente nella baseline. Il nuovo metodo aggiunge parallelismo alla preparazione e cambia il lavoro riutilizzato.}
+\end{figure}
+Per una matrice densa, la fattorizzazione costa $\Theta(d^3)$ per lambda.
+Con BLAS a un thread e $P_\lambda=\min(P,L)$, i candidati sono distribuiti
+su $P_\lambda$ worker. Una stima orientativa è
+\[
+T_{\mathrm{LU}}\simeq
+\left\lceil\frac{L}{P_\lambda}\right\rceil
+\left(C_{\mathrm{fatt}}(d)+C_{\mathrm{pred}}(m,d,c)\right).
+\]
+\semplice{Ci sono già più lavoratori, ma ognuno rifà un'elaborazione pesante
+per ogni lambda che riceve. Cerchiamo una preparazione comune da riusare.}
+\begin{attenzione}[title=Confronto preciso]
+In questa versione minima il metodo predefinito è LU. Cholesky e SPIKE
+appartenevano agli esperimenti poi rimossi. Le loro vecchie soglie non sono
+la soglia di sorpasso rispetto alla baseline attuale.
+\end{attenzione}
+\page{Il cambiamento matematico, passo per passo}
+Usiamo trasformazioni ortogonali: $Q_1^{\T}Q_1=Q_2^{\T}Q_2=I$.
+\begin{align}
+\color{Orange}B&=Q_1^{\T}A Q_1 &&\text{(piena $\to$ banda)},\label{eq:band}\\
+\color{Teal}T&=Q_2^{\T}B Q_2 &&\text{(banda $\to$ tridiagonale)},\\
+Q&=Q_1Q_2,\qquad A=Q T Q^{\T}.\label{eq:similar}
+\end{align}
+Ponendo $W_\lambda=Q U_\lambda$ e moltiplicando il sistema a sinistra per
+$Q^{\T}$ otteniamo
+\begin{align}
+(A+\lambda I)Q U_\lambda&=b,\\
+Q^{\T}A Q U_\lambda+\lambda Q^{\T}Q U_\lambda&=Q^{\T}b,\\
+\boxed{\color{Blue}(T+\lambda I)U_\lambda=G},\qquad
+\boxed{\color{Purple}G=Q^{\T}b}.\label{eq:transformed}
+\end{align}
+Il passaggio decisivo è $Q^{\T}(\lambda I)Q=\lambda I$: la stessa $Q$
+funziona per \emph{tutti} i candidati. Non servono autovalori o autovettori.
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,minimum width=4.6cm] (old) at (0,0) {coordinate originali\\$(A+\lambda I)W=b$};
+\node[box,fill=Teal!12,draw=Teal,minimum width=4.6cm] (new) at (8,0) {coordinate trasformate\\$(T+\lambda I)U=G$};
+\draw[arr,Blue,bend left=18] (old.north east) to node[above,align=center,font=\small] {cambio di coordinate\\$U=Q^{\T}W$} (new.north west);
+\draw[arr,Purple,bend left=18] (new.south west) to node[below,align=center,font=\small] {ricostruzione equivalente\\$W=QU$} (old.south east);
+\end{tikzpicture}
+\caption{Si risolve lo stesso problema in una base diversa. L'identità è matematica; i risultati floating point hanno gli arrotondamenti dei rispettivi algoritmi.}
+\end{figure}
+\semplice{È come descrivere lo stesso luogo con una mappa ruotata. Cambiano
+le coordinate e la forma dei conti; l'informazione viene conservata.
+Tutti i dati coinvolti devono usare la stessa mappa.}
+\page{Perché due stadi: piena, banda, tridiagonale}
+Una matrice a semibanda $b_w$ ha zeri quando $|i-j|>b_w$. Una
+tridiagonale ha $b_w=1$. Le trasformazioni introducono zeri in una
+\emph{rappresentazione equivalente}, mantenendo $d$ coordinate.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.43cm,y=.43cm]
+\foreach \offset/\bw/\col/\name in {0/7/Blue/A,12/2/Orange/B,24/1/Teal/T}{
+\begin{scope}[shift={(\offset,0)}]
+\foreach \i in {0,...,7}\foreach \j in {0,...,7}{
+\pgfmathtruncatemacro{\inside}{abs(\i-\j)<=\bw}
+\ifnum\inside=1\fill[\col!65] (\j,-\i) rectangle ++(1,-1);\else\fill[Ink!5] (\j,-\i) rectangle ++(1,-1);\fi
+\draw[white] (\j,-\i) rectangle ++(1,-1);}
+\node[font=\large\bfseries,text=\col] at (4,1) {$\name$};
+\end{scope}}
+\draw[arr] (8.5,-4)--(11.3,-4);\draw[arr] (20.5,-4)--(23.3,-4);
+\node[font=\small,text=Blue] at (4,-9.2) {piena};
+\node[font=\small,text=Orange] at (16,-9.2) {banda};
+\node[font=\small,text=Teal] at (28,-9.2) {tridiagonale};
+\end{tikzpicture}
+\caption{Schema didattico con $d=8$ e semibanda intermedia 2. Nel percorso pubblico il tile è 64 e il blocco interno Householder è 16.}
+\end{figure}
+Il primo stadio usa operazioni su blocchi, con buona riutilizzazione in cache
+(BLAS di livello 3). Il secondo usa aggiornamenti locali e una wavefront
+con dipendenze fra passi vicini. La riduzione a due stadi è una tecnica nota,
+descritta in letteratura \cite{twostage}; qui è integrata nella ricerca ridge.
+\begin{idea}[title=I numeri del codice]
+$\texttt{tile}=64$, $\texttt{ib}=16$, $n_b=\min(64,d)$ e
+$v_b=\max(1,\lfloor n_b/4\rfloor)$. Il valore $v_b$ organizza i riflettori
+del secondo stadio; non è il numero di thread. La matrice simmetrica viene
+trattata nella sua parte inferiore.
+\end{idea}
+\semplice{Il primo passaggio organizza grandi pezzi di lavoro efficienti;
+il secondo rifinisce la zona attorno alla diagonale, coordinando lavoratori vicini.}
+\page{Predizioni e norme: anche le feature cambiano coordinate}
+Per predire servirebbe $XW_\lambda=XQU_\lambda$. Prepariamo invece
+\[
+\boxed{H=XQ},\qquad \boxed{G=Q^{\T}b},\qquad
+\boxed{S_\lambda=H U_\lambda}.
+\]
+Il programma normalizza inoltre ogni colonna dei pesi. Poiché $Q$ è
+ortogonale, $\norm{Q u_k}_2=\norm{u_k}_2$. Definendo
+\[
+D_\lambda=\operatorname{diag}\left(
+\frac{1}{\norm{u_{\lambda,1}}_2+10^{-10}},\ldots,
+\frac{1}{\norm{u_{\lambda,c}}_2+10^{-10}}\right),
+\]
+la predizione del codice è
+\[
+\boxed{S_\lambda=(XQ)U_\lambda D_\lambda
+             =XW_\lambda D_\lambda},\quad
+\widehat y_i=\operatorname*{argmax}_{k} (S_\lambda)_{ik}.
+\]
+\begin{figure}[H]\centering
+\begin{tikzpicture}[scale=.95]
+\draw[->,Ink!60] (-2.4,0)--(2.7,0) node[right] {$x$};\draw[->,Ink!60] (0,-1.8)--(0,2.5) node[above] {$y$};
+\draw[dashed,Teal,->] (-1.7,-1.7)--(1.9,1.9) node[right] {$x'$};
+\draw[dashed,Purple,->] (1.5,-1.5)--(-1.8,1.8) node[left] {$y'$};
+\draw[Blue!25,thick] (0,0) circle (2cm);
+\draw[-{Latex[length=3mm]},very thick,Blue] (0,0)--(1.6,1.2) node[above right,align=left] {stesso vettore\\stessa lunghezza};
+\node[box,fill=Teal!10,draw=Teal,minimum width=5.2cm] at (6,1.2) {$\norm{Qu}_2=\norm{u}_2$};
+\node[box,minimum width=5.2cm] at (6,-.6) {b e X seguono la stessa Q\\pesi normalizzati equivalenti};
+\end{tikzpicture}
+\caption{Analogia bidimensionale del cambio di base. Il calcolo usa combinazioni ortogonali in $d$ dimensioni.}
+\end{figure}
+Le parità fra classi conservano il primo massimo. A parità di accuracy fra
+candidati, il wrapper Python sceglie il lambda maggiore. Non si costruisce
+una Q densa nel percorso di produzione: si applicano i riflettori compatti.
+\page{Un esempio numerico piccolo, verificabile}
+Scegliamo una base ortogonale semplice e una tridiagonale positiva:
+\[
+Q=\frac12\begin{bmatrix}1&1&1&1\\1&-1&1&-1\\1&1&-1&-1\\1&-1&-1&1\end{bmatrix},
+\qquad
+T=\begin{bmatrix}4&1&0&0\\1&5&1&0\\0&1&6&1\\0&0&1&7\end{bmatrix}.
+\]
+Allora la matrice densa equivalente è
+\[
+\color{Blue}A=QTQ^{\T}=\ExampleA.
+\]
+Per $b=(1,2,3,4)^{\T}$ e $X=(2,0,1,3)$ otteniamo
+\[
+\color{Purple}G=Q^{\T}b=\ExampleG,\qquad
+\color{Teal}H=XQ=\ExampleH.
+\]
+Con $\lambda=1$:
+\[
+U=(T+I)^{-1}G,\qquad W=(A+I)^{-1}b=QU,
+\qquad XW=HU\simeq\ExampleScore.
+\]
+L'inversa qui indica soltanto l'identità matematica; nel codice si risolvono
+sistemi, senza calcolare matrici inverse. L'esempio mostra il punteggio prima
+della normalizzazione per renderne più leggibile l'equivalenza.
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,minimum width=3.6cm] (orig) at (0,0) {sistema $4\times4$ denso\\$A+I$};
+\node[box,fill=Teal!15,draw=Teal,minimum width=3.6cm] (simp) at (6.2,0) {tre diagonali\\$T+I$};
+\node[box,fill=Purple!12,draw=Purple,minimum width=4cm] (eq) at (3.1,-1.6) {stesso punteggio finale\\$XW=HU$};
+\draw[arr] (orig)--node[above,font=\small]{base Q}(simp);\draw[arr] (orig)--(eq);\draw[arr] (simp)--(eq);
+\end{tikzpicture}
+\caption{Esempio costruito per avere numeri semplici: questa Q non è una traccia della Q scelta da PLASMA. I valori sono rigenerati e verificati da \cod{genera_figure.py}.}
+\end{figure}
+\page{Primo stadio: piastrelle, località e grafo dei task}
+Un \emph{tile} è una piccola matrice rettangolare. Il bordo di un tile non
+coincide necessariamente con un cambio di proprietario permanente: nel primo
+stadio il runtime esegue i task pronti rispettando le dipendenze sui dati.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.45cm,y=.45cm]
+\foreach \i in {0,...,7}\foreach \j in {0,...,7}{
+\pgfmathtruncatemacro{\v}{mod(int(\i/2)+int(\j/2),4)}
+\fill[P\v!20] (\j,-\i) rectangle ++(1,-1);\draw[white] (\j,-\i) rectangle ++(1,-1);}
+\foreach \v in {0,2,4,6,8}{\draw[Ink,thick] (\v,0)--(\v,-8);\draw[Ink,thick] (0,-\v)--(8,-\v);}
+\draw[Coral,very thick] (2,0)--(2,-8);
+\node[note,text width=5.8cm] at (16,-3.8) {Bordo rosso: confine fra tile.\\[2mm]I task che leggono o scrivono gli stessi dati devono essere ordinati.\\[2mm]I colori identificano tile, non un'affinità fissa ai thread.};
+\end{tikzpicture}
+\caption{Suddivisione didattica: tile di due elementi. Nel programma il lato nominale è 64; l'ultimo tile può essere più piccolo.}
+\end{figure}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=8mm and 14mm]
+\node[task,fill=Blue!15] (qr) {QR del pannello};
+\node[task,fill=Orange!15,right=of qr] (u1) {aggiorna tile A};
+\node[task,fill=Purple!15,below=of u1] (u2) {aggiorna tile B};
+\node[task,fill=Teal!15,right=of u1] (next) {pannello seguente};
+\draw[arr] (qr)--(u1);\draw[arr] (qr)--(u2);\draw[arr] (u1)--(next);\draw[arr] (u2)--(next);
+\end{tikzpicture}
+\caption{DAG concettuale del primo stadio: due aggiornamenti indipendenti possono procedere insieme. Il DAG completo è generato internamente da PLASMA tramite dipendenze OpenMP.}
+\end{figure}
+\semplice{Un lavoratore prepara un pezzo che altri possono usare. Quando due
+lavoratori toccano pezzi distinti, procedono insieme; se condividono dati,
+seguono l'ordine indicato dalle frecce. Il tile aiuta anche a riusare dati in cache.}
+\page{Secondo stadio: che cos'è un bulge?}
+Un riflettore Householder ha la forma
+\[
+F=I-\tau vv^{\T},\qquad F^{\T}F=I,
+\qquad B\leftarrow F^{\T}BF.
+\]
+Applicarlo ai due lati conserva la simmetria e annulla gli elementi scelti.
+L'aggiornamento può produrre temporaneamente nuovi elementi fuori dalla
+banda desiderata: il \emph{bulge}, o rigonfiamento. Altri aggiornamenti lo
+spostano ed eliminano più avanti.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.36cm,y=.36cm]
+\foreach \shift/\rr/\cc/\lab in {0/3/0/1,13/5/2/2,26/7/4/3}{
+\begin{scope}[shift={(\shift,0)}]
+\foreach \i in {0,...,8}\foreach \j in {0,...,8}{
+\pgfmathtruncatemacro{\inband}{abs(\i-\j)<=2}
+\ifnum\inband=1\fill[Teal!40] (\j,-\i) rectangle ++(1,-1);\else\fill[Ink!5] (\j,-\i) rectangle ++(1,-1);\fi
+\draw[white] (\j,-\i) rectangle ++(1,-1);}
+\filldraw[fill=Coral!80,draw=Coral] (\cc,-\rr) rectangle ++(1,-1);
+\filldraw[fill=Coral!30,draw=Coral] (\rr,-\cc) rectangle ++(1,-1);
+\node[text=Ink,font=\small] at (4.5,-10.3) {passo \lab};
+\end{scope}}
+\draw[arr,Coral] (9.5,-4.5)--(12.3,-4.5);\draw[arr,Coral] (22.5,-4.5)--(25.3,-4.5);
+\end{tikzpicture}
+\caption{Schema qualitativo, non impronta esatta di un singolo kernel. Il rosso rappresenta valori temporanei fuori banda; la parte superiore è mostrata per simmetria, pur memorizzando operativamente il triangolo inferiore.}
+\end{figure}
+\begin{center}\small\begin{tabularx}{\linewidth}{lX}\toprule
+Tipo nel codice&Ruolo dei kernel PLASMA\\\midrule
+1&genera un riflettore e aggiorna il primo blocco diagonale della sweep\\
+2&aggiorna una zona fuori diagonale e genera il riflettore che sposta il bulge\\
+3&applica il riflettore al blocco diagonale successivo\\\bottomrule
+\end{tabularx}\end{center}
+\semplice{Pulire una zona può spostare del lavoro nella zona vicina. Il
+lavoratore successivo deve ricevere i valori aggiornati, non una copia vecchia.}
+\page{Il bordo condiviso: un esempio esatto degli indici}
+Da qui gli indici dei task partono da zero, come nel C. Usiamo un esempio
+con $d=13$, $n_b=4$ e tre thread. Il task $K_{0,2}$ è di tipo 3 e aggiorna
+il blocco diagonale $[5,8]\times[5,8]$. Il task $K_{1,0}$, di tipo 1,
+aggiorna $[2,5]\times[2,5]$ e la colonna da eliminare. Entrambi coinvolgono
+l'elemento $(5,5)$: un vero bordo numerico condiviso.
+È un esempio a scala ridotta delle formule, non una configurazione offerta
+dal wrapper pubblico, che usa tile 64.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.43cm,y=.43cm]
+\foreach \i in {0,...,9}\foreach \j in {0,...,9}{
+\fill[Ink!4] (\j,-\i) rectangle ++(1,-1);\draw[white] (\j,-\i) rectangle ++(1,-1);}
+\fill[P0!35] (2,-2) rectangle (6,-6);\fill[P1!35] (5,-5) rectangle (9,-9);
+\draw[P0,very thick] (2,-2) rectangle (6,-6);\draw[P1,very thick] (5,-5) rectangle (9,-9);
+\filldraw[fill=Coral!80,draw=Coral,very thick] (5,-5) rectangle ++(1,-1);
+\foreach \v in {2,5,8}{\node[font=\scriptsize,above] at (\v+.5,.05) {\v};\node[font=\scriptsize,left] at (-.1,-\v-.5){\v};}
+\node[note,text width=5.7cm] at (18,-2.5) {\textcolor{P1}{P1: $K_{0,2}$, prima}\\\textcolor{P0}{P0: $K_{1,0}$, dopo}\\\textcolor{Coral}{$(5,5)$ richiede l'ordine corretto.}};
+\draw[arr,Coral] (6,-5.5)--(12,-5.5) node[right,note] {stessa memoria condivisa};
+\end{tikzpicture}
+\caption{Supporti diagonali reali di due task dell'esempio. Gli aggiornamenti di tipo 1 comprendono anche la colonna del riflettore, non disegnata per isolare il bordo comune.}
+\end{figure}
+\[
+\color{P1}K_{0,2}\ \longrightarrow\ \color{Coral}\text{pubblicazione del completamento}
+\ \longrightarrow\ \color{P0}K_{1,0}.
+\]
+$K_{1,0}$ attende $\texttt{progress[2]}=1$ prima di leggere i dati. Mentre
+procede, altri task senza conflitti possono continuare più in basso.
+\semplice{Due lavoratori usano lo stesso angolo della tabella. Il primo lo
+aggiorna e dà il via libera; il secondo entra soltanto dopo quel segnale.}
+\page{Le formule dello scheduler statico}
+Una \emph{sweep} $s$ elimina una colonna e insegue il bulge fino al bordo.
+Nel codice, per gli indici esterni $i$ e $k\in\{0,1,2\}$:
+\begin{align}
+t&=3(i-s)+k,\\
+a_{s,t}&=\left\lfloor\frac{t}{2}\right\rfloor n_b+s+1,\qquad
+z_{s,t}=\min(a_{s,t}+n_b-1,d-1),\\
+\mathrm{owner}(s,t)&=\left\lfloor a_{s,t}/n_b\right\rfloor\bmod P_b,\qquad
+P_b=\min\left(P,\left\lceil d/n_b\right\rceil\right).
+\end{align}
+$[a,z]$ è l'intervallo di base del kernel. Per il tipo 2 entra anche il blocco
+successivo, con $J_1=z+1$ e $J_2=\min(z+n_b,d-1)$.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.8cm,y=1cm]
+\foreach \j in {0,...,12}{
+\pgfmathtruncatemacro{\p}{mod(int(\j/4),3)}
+\filldraw[fill=P\p!25,draw=white] (\j,0) rectangle ++(1,.8);
+\node[font=\scriptsize] at (\j+.5,.4){\j};}
+\draw[decorate,decoration={brace,amplitude=5pt},P0,thick] (4,-.2)--(0,-.2) node[midway,below=6pt,font=\small]{P0};
+\draw[decorate,decoration={brace,amplitude=5pt},P1,thick] (8,-.2)--(4,-.2) node[midway,below=6pt,font=\small]{P1};
+\draw[decorate,decoration={brace,amplitude=5pt},P2,thick] (12,-.2)--(8,-.2) node[midway,below=6pt,font=\small]{P2};
+\node[font=\scriptsize,text=P0,above] at (12.5,1) {P0};
+\end{tikzpicture}
+\caption{Mappa di proprietà per l'indice iniziale $a$ nell'esempio $n_b=4$, $P_b=3$. Gli intervalli dei task possono attraversare queste linee: la sicurezza è data dalle dipendenze, non dal colore dell'indice.}
+\end{figure}
+Le dipendenze interne sono
+\[
+K_{s,t-1}\to K_{s,t}\quad(t>0),\qquad
+K_{s-1,t+2}\to K_{s,t}\quad(s>0),
+\]
+con trattamento delle sentinelle quando il predecessore oltrepassa il bordo.
+\begin{idea}[title=Le due attese corrispondenti nel C]
+\cod{wait_for(progress, task-1, sweep+1)} e
+\cod{wait_for(progress, task+2, sweep)}.
+Il valore memorizzato è la sweep \emph{completata più uno}: non è un booleano.
+\end{idea}
+\semplice{Il proprietario è determinato dalla geometria del problema.
+Questo stadio non usa work stealing: ogni thread conosce i propri task e
+attende quando mancano i dati necessari.}
+\page{Il DAG effettivo dell'esempio: 34 task}
+Un DAG è un grafo orientato senza cicli: una freccia $u\to v$ significa che
+$v$ deve aspettare $u$. I nodi e le frecce qui sono generati dalle formule
+dello scheduler per $d=13$, $n_b=4$, $P_b=3$.
+\begin{figure}[H]\centering
+\input{fig_dag.tex}
+\caption{Colore interno: thread proprietario (P0 blu, P1 arancio, P2 viola).
+Frecce orizzontali: ordine nella sweep. Frecce viola: dipendenza dalla sweep
+precedente. Il collegamento rosso è il bordo $(5,5)$ discusso prima. I nodi
+con contorno rosso terminano una sweep e pubblicano anche le sentinelle finali.}
+\end{figure}
+Per i nodi interni, $r=t+3s$ cresce su ogni arco e rende visibile la
+wavefront. I nodi che non sono legati da dipendenze possono concorrere, se
+hanno thread disponibili. Il DAG non garantisce da solo che ci siano sempre
+$P_b$ task utili pronti: contano cammino critico, proprietà e costi dei kernel.
+\page{Come si muovono i thread nel tempo}
+Il diagramma seguente mantiene proprietà, ordine per worker e dipendenze
+dell'esempio precedente, ma assume \textbf{un'unità di tempo per ogni task}.
+I numeri nelle caselle sono $s.t$; le caselle grigie indicano attesa.
+\begin{figure}[H]\centering
+\input{fig_timeline.tex}
+\caption{Simulazione didattica a costo unitario: 34 task in 28 passi su tre
+worker. Non è una misura, un profiler o una previsione dei millisecondi
+reali; i tre tipi di kernel hanno costi diversi. Il secondo pannello prosegue il primo.}
+\end{figure}
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[task,fill=P0!20] (a) at (0,0) {$K_{0,1}$};
+\node[task,fill=P1!20] (b) at (3,0) {$K_{0,2}$};
+\node[task,fill=P0!20] (c) at (6,1) {$K_{1,0}$};
+\node[task,fill=P1!20] (d) at (6,-1) {$K_{0,3}$};
+\draw[arr] (a)--(b);\draw[arr] (b)--(c);\draw[arr] (b)--(d);
+\node[note,text width=4cm] at (10,0) {Due avanzamenti possono partire dopo lo stesso predecessore, su thread diversi.};
+\end{tikzpicture}
+\caption{Fronte d'onda locale. Il programma sovrappone task compatibili, non esegue contemporaneamente ogni aggiornamento della matrice.}
+\end{figure}
+Nel bulge chasing il ciclo di attesa usa \cod{sched_yield()}: il thread
+ricontrolla un segnale atomico e cede opportunità di esecuzione allo scheduler
+OS. Non è uno scambio di messaggi e non implica assenza di costo CPU.
+\semplice{Un lavoratore può avere ancora lavoro assegnato ma non poterlo
+iniziare. Aumentare i lavoratori aiuta soltanto se ci sono abbastanza pezzi pronti.}
+\page{Release/acquire: il via libera deve pubblicare i dati}
+Un aggiornamento numerico è composto da più scritture. Il segnale atomico
+di completamento deve pubblicarle prima che il vicino le usi. Il codice
+usa atomiche \textbf{C11}, insieme ai team OpenMP:
+\begin{lstlisting}[language=C]
+// Produttore: dopo gli aggiornamenti di matrice, V e tau.
+atomic_store_explicit(progress + task, sweep + 1,
+                      memory_order_release);
+// Consumatore: prima di leggere le regioni aggiornate.
+while (atomic_load_explicit(progress + predecessor,
+                           memory_order_acquire) != expected)
+    sched_yield();
+\end{lstlisting}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=8mm]
+\node[box,fill=P1!15,draw=P1,text width=4.2cm] (write) at (0,0) {P1: aggiorna matrice\\e riflettori condivisi};
+\node[box,fill=P1!15,draw=P1,text width=4.2cm,below=of write] (rel) {P1: store \textbf{release}\\del segnale};
+\node[box,fill=P0!15,draw=P0,text width=4.2cm] (acq) at (7,-1.8) {P0: load \textbf{acquire}\\osserva il segnale atteso};
+\node[box,fill=P0!15,draw=P0,text width=4.2cm,below=of acq] (read) {P0: legge i dati aggiornati\\ed esegue il proprio kernel};
+\draw[arr] (write)--(rel);\draw[arr,Coral] (rel)--node[above,sloped,font=\small]{sincronizzazione}(acq);\draw[arr] (acq)--(read);
+\draw[arr,dashed,Teal,bend right=30] (write.south west) to node[below,sloped,font=\small]{happens-before} (read.south west);
+\end{tikzpicture}
+\caption{Pubblicazione dei dati tramite flag. L'arco release/acquire vale quando la lettura osserva la pubblicazione pertinente; le attese e l'ordine della wavefront ne stabiliscono l'uso corretto.}
+\end{figure}
+La specifica C11 distingue atomicità e ordinamento \cite{c11}. Nel nostro
+adattamento release/acquire corregge errori intermittenti osservati su ARM
+con la pubblicazione precedente. Le celle numeriche non diventano tutte
+atomiche: l'accesso alle zone viene ordinato dai segnali e dalle dipendenze.
+\semplice{Il cartello ``finito'' deve significare che anche i numeri sono
+pronti. Un cartello aggiornato da solo non basta a dare questa garanzia.}
+\page{Bordo esterno: ultimo blocco e task che non esistono}
+Il limite destro/inferiore viene rispettato con
+\[
+z=\min(a+n_b-1,d-1),\qquad J_2=\min(z+n_b,d-1).
+\]
+Esempio $d=10$, $n_b=4$: i blocchi nominali hanno dimensioni $4,4,2$.
+Per una sweep con $a=9$, l'intervallo utile è solo $[9,9]$.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.88cm,y=1cm]
+\foreach \i in {0,...,9}{\pgfmathtruncatemacro{\p}{int(\i/4)}\filldraw[fill=P\p!30,draw=white] (\i,0) rectangle ++(1,.8);\node[font=\small] at (\i+.5,.4){\i};}
+\draw[Coral,very thick] (10,-.3)--(10,1.25);
+\foreach \i in {10,11}{\filldraw[fill=Ink!5,draw=Ink!25,dashed] (\i,0) rectangle ++(1,.8);\node[font=\small,text=Ink!40] at (\i+.5,.4){$\times$};}
+\node[note,anchor=north,text width=5cm] at (9.7,-.6) {Bordo fisico: nessuna lettura o scrittura oltre l'indice 9.};
+\end{tikzpicture}
+\caption{Blocco incompleto: la geometria numerica è tagliata alla dimensione reale. I riquadri tratteggiati non sono dati aggiunti al problema.}
+\end{figure}
+Quando la sweep finisce, il codice pubblica anche i due passi successivi:
+\begin{lstlisting}[language=C]
+if (done)
+    for (int t = 1; t < 3; ++t)
+        atomic_store_explicit(progress + task + t,
+                              sweep + 1, memory_order_release);
+\end{lstlisting}
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[task,fill=P2!20] (last) at (0,0) {ultimo task reale};
+\node[box,fill=Coral!10,draw=Coral] (s1) at (4,1) {flag $t+1$: completato};
+\node[box,fill=Coral!10,draw=Coral] (s2) at (4,-1) {flag $t+2$: completato};
+\node[task,fill=P0!20] (next) at (9,0) {sweep seguente};
+\draw[arr] (last)--(s1);\draw[arr] (last)--(s2);\draw[arr] (s1)--(next);\draw[arr] (s2)--(next);
+\end{tikzpicture}
+\caption{Sentinelle di avanzamento: evitano attese su task numerici ormai inesistenti. Non introducono righe fantasma o valori di padding.}
+\end{figure}
+Il test di fine sweep è $z\ge d-1$, oppure tipo 2 con $z\ge d-2$.
+\page{Che cosa viene condiviso ai bordi? E gli halo?}
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,fill=P0!15,draw=P0,text width=3cm] (p0) at (0,0) {thread P0\\scratch privato};
+\node[box,fill=P1!15,draw=P1,text width=3cm] (p1) at (9,0) {thread P1\\scratch privato};
+\node[box,fill=Teal!13,draw=Teal,text width=4cm] (shared) at (4.5,-1.8) {unica matrice in RAM\\riflettori $V,\tau$ condivisi};
+\node[box,fill=Coral!10,draw=Coral,text width=4cm] (flags) at (4.5,1.3) {array atomico progress\\pubblicazione release/acquire};
+\draw[arr] (p0)--(shared);\draw[arr] (p1)--(shared);\draw[arr] (p0)--(flags);\draw[arr] (flags)--(p1);
+\end{tikzpicture}
+\caption{Memoria condivisa su un singolo processo: i worker possono leggere regioni sovrapposte dopo la sincronizzazione; gli scratch rimangono separati.}
+\end{figure}
+\begin{center}\small\begin{tabularx}{\linewidth}{lXX}\toprule
+Aspetto&Questo metodo&Tipico dominio MPI con halo\\\midrule
+Dati al confine&stessa RAM, aggiornamenti ordinati&copie locali da rendere coerenti con messaggi\\
+Comunicazione&dipendenze e flag atomici&invii/ricezioni dei dati di bordo\\
+Bordo esterno&intervalli accorciati e flag di fine sweep&condizioni al contorno dipendenti dal problema\\
+Lavoro locale&riflettori e aggiornamenti di matrici&spesso stencil su una griglia\\\bottomrule
+\end{tabularx}\end{center}
+Non vengono imposte condizioni fisiche al contorno: è un problema di algebra
+lineare. Una dipendenza locale assomiglia a una wavefront su griglia,
+ma non trasforma la Gram in una discretizzazione PDE. Il metodo non usa
+MPI e non effettua halo exchange fra processi.
+\semplice{I lavoratori vedono lo stesso tavolo. Si coordinano su quando
+usare una zona; non devono spedire una copia del bordo a un altro computer.}
+\page{Memoria compatta: lo spazio per il bulge}
+Il secondo stadio usa una banda in memoria con leading dimension
+$\texttt{ldab}=2n_b+1$. Nella parte inferiore, una coordinata matematica
+$(i,j)$ viene rappresentata all'offset
+\[
+\boxed{\operatorname{offset}(i,j)=j\,(2n_b+1)+(i-j)}.
+\]
+Le prime posizioni per colonna conservano diagonale e banda iniziale; le
+successive consentono di ospitare i valori temporanei del bulge. Alla fine
+$T$ si estrae da offset $j\,\texttt{ldab}$ e $j\,\texttt{ldab}+1$.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.75cm,y=.75cm]
+\foreach \delta in {0,...,4}\foreach \j in {0,...,9}{
+\pgfmathtruncatemacro{\valid}{\j+\delta<10}
+\ifnum\valid=0
+\fill[Ink!7] (\j,-\delta) rectangle ++(1,-1);
+\else
+\ifnum\delta=0\fill[Blue!65] (\j,-\delta) rectangle ++(1,-1);
+\else\ifnum\delta<3\fill[Teal!45] (\j,-\delta) rectangle ++(1,-1);
+\else\fill[Orange!45] (\j,-\delta) rectangle ++(1,-1);\fi\fi
+\fi\draw[white] (\j,-\delta) rectangle ++(1,-1);}
+\foreach \j in {0,...,9}\node[font=\scriptsize,above] at (\j+.5,.1){$j=\j$};
+\node[anchor=east,font=\small,text=Blue] at (-.2,-.5){$i-j=0$};
+\node[anchor=east,font=\small,text=Teal] at (-.2,-2){banda};
+\node[anchor=east,font=\small,text=Orange] at (-.2,-4){bulge};
+\node[note,text width=3.2cm] at (13,-1.2) {Esempio $d=10$, $n_b=2$:\\cinque righe di storage per colonna.};
+\node[note,text width=3.2cm] at (13,-4) {Grigio: coordinate oltre il limite matematico, ignorate dai kernel validi.};
+\end{tikzpicture}
+\caption{Spazio di lavoro compatto illustrativo. La capacità extra di un
+buffer è diversa dall'aggiungere incognite o condizioni al contorno al sistema.}
+\end{figure}
+\semplice{È come lasciare spazio libero sul tavolo per appoggiare numeri
+temporanei. La tabella del problema mantiene la stessa dimensione; quando
+un blocco arriva al bordo si lavora soltanto sugli indici validi.}
+La banda usa $O(d n_b)$ celle, ma l'intera preparazione conserva anche tile
+e riflettori: il suo workspace complessivo rimane $O(d^2)$, non $O(d)$.
+La sola tridiagonale finale usa $2d-1$ coefficienti distinti. I buffer di
+proiezione crescono inoltre con $(m+c)d$.
+\page{Applicare Q ai dati: righe private, riflettori condivisi}
+Per ottenere insieme $G$ e $H$, il codice costruisce
+\[
+R=\begin{bmatrix}b^{\T}\\X\end{bmatrix}\in\R^{(c+m)\times d},\qquad
+RQ_1Q_2=\begin{bmatrix}(Q^{\T}b)^{\T}\\XQ\end{bmatrix}.
+\]
+Per l'applicazione di $Q_2$ a destra, il blocco di righe ha dimensione
+$g=\min(64,\lceil(c+m)/P\rceil)$. Con $c=3$, $m=64$, $P=4$:
+$g=17$ e gli intervalli sono $0{:}16$, $17{:}33$, $34{:}50$, $51{:}66$.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=.75cm,y=.8cm]
+\foreach \p/\yy/\lab in {0/0/{0--16},1/-1.2/{17--33},2/-2.4/{34--50},3/-3.6/{51--66}}{
+\filldraw[fill=P\p!25,draw=P\p] (0,\yy) rectangle (8,\yy-.8);
+\node[font=\small] at (4,\yy-.4){P\p: righe \lab, tutte le colonne};}
+\draw[Coral,very thick] (0,-.15)--(8,-.15);
+\node[note,text width=5.4cm] at (12,-.7) {Le prime tre righe contengono $b^{\T}$; le successive contengono X.};
+\node[box,fill=Purple!12,draw=Purple,text width=4cm] (ref) at (12,-3) {riflettori compatti\\condivisi, in lettura};
+\foreach \yy in {-.4,-1.6,-2.8,-4}\draw[arr,Purple!60] (ref.west)--(8,\yy);
+\end{tikzpicture}
+\caption{Partizione esatta dell'esempio per la fase Q2. Ogni worker scrive soltanto le proprie righe, anche quando un riflettore agisce su colonne che attraversano più tile.}
+\end{figure}
+L'ordine dei riflettori è essenziale: a destra si calcola $R(Q_1Q_2)$.
+L'adattatore corregge la visita dei blocchi rispetto al ramo PLASMA usato
+inizialmente. I blocchi incompleti di righe usano
+$\texttt{len}=\min(g,c+m-\texttt{row})$.
+Righe disgiunte evitano conflitti logici, ma possono condividere linee di
+cache: il possibile \emph{false sharing} è un costo prestazionale diverso
+da una race condition. Questa contesa non è modellata nel Gantt didattico.
+\semplice{Tutti leggono lo stesso libretto di istruzioni, ma ciascuno
+riscrive solo le righe che gli sono assegnate. Nessun vicino può sovrascriverle.}
+\page{Dopo la preparazione: tutti i lambda e DPTSV}
+La tridiagonale simmetrica è memorizzata con due vettori: diagonale $d_i$
+e sottodiagonale $e_i$. Per ogni candidato:
+\[
+(T+\lambda I)U_\lambda=G,\qquad
+(T+\lambda I)_{ii}=d_i+\lambda,\quad (T+\lambda I)_{i+1,i}=e_i.
+\]
+Il codice usa DPTSV, fattorizzazione $LDL^{\T}$ per una tridiagonale
+simmetrica definita positiva. La ricorrenza scalare è
+\[
+\delta_0=d_0+\lambda,\qquad
+\ell_i=\frac{e_{i-1}}{\delta_{i-1}},\qquad
+\delta_i=d_i+\lambda-\frac{e_{i-1}^2}{\delta_{i-1}}.
+\]
+Segue la soluzione con i fattori, per tutte le classi.
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,fill=Teal!15,draw=Teal,text width=3cm] (prep) at (0,0) {$T,G,H$ pronti\\condivisi in lettura};
+\foreach \i/\yy/\co in {0/2/P0,1/.7/P1,2/-.7/P2,3/-2/P3}{
+\node[box,fill=\co!15,draw=\co,text width=3.2cm] (job\i) at (5,\yy) {worker \i\\lambda assegnati};
+\draw[arr] (prep)--(job\i);}
+\node[box,text width=3cm] (scores) at (10.3,0) {accuracy per candidato\\poi migliore in Python};
+\foreach \i in {0,1,2,3}\draw[arr] (job\i)--(scores);
+\end{tikzpicture}
+\caption{Fork/join fra candidati con \cod{parallel for schedule(static)}. DPTSV, norma e scoring sono sequenziali all'interno del singolo candidato. Non è presente SPIKE né un parallelismo interno alla ricorrenza DPTSV.}
+\end{figure}
+\semplice{La preparazione ha già semplificato ogni problema. Ora ogni
+lavoratore prende alcuni lambda, li risolve e scrive le proprie accuracy.
+Alla fine si sceglie il migliore con una scansione deterministica.}
+\page{Fasi, barriere, BLAS e controllo del contesto}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=1cm,y=1cm]
+\foreach \x/\col/\name in {0/Blue/{layout},2/Orange/{piena--banda},4/Purple/{bulge},6/Teal/{Q1},8/Green/{Q2},10/Blue/{lambda}}{
+\node[box,fill=\col!15,draw=\col,text width=1.65cm,font=\scriptsize] (s\x) at (\x,0){\name};
+\foreach \p in {0,1,2}{\fill[\col!35] (\x-.7,-.9-.22*\p) rectangle ++(1.4,.14);}}
+\foreach \x/\xx in {0/2,2/4,4/6,6/8,8/10}\draw[arr] (s\x)--(s\xx);
+\foreach \xx in {1,3,5,7,9}\draw[Coral,dashed,thick] (\xx,.65)--(\xx,-1.6);
+\node[note,anchor=north,text width=12cm] at (5,-1.9) {Linee rosse: fine di una fase prima di consumarne i risultati.
+Le regioni parallele si susseguono; non sono team annidati.};
+\end{tikzpicture}
+\caption{Pipeline del percorso attuale. Il grafico mostra l'ordine delle fasi, non le loro durate e non una sovrapposizione fra i due stadi.}
+\end{figure}
+\begin{itemize}
+\item BLAS è limitata a un thread dal wrapper già esistente; i team OpenMP
+  gestiscono il parallelismo esterno. Questo evita la moltiplicazione dei team.
+\item Il GIL Python viene rilasciato durante il calcolo nativo.
+\item PLASMA ha un contesto globale: un mutex protegge la sua preparazione.
+  Le preparazioni di chiamate Python concorrenti sono serializzate.
+\item Ogni worker riusa buffer privati per diagonale shifted, sottodiagonale,
+  pesi e punteggi. Non si alloca una matrice densa per ogni candidato.
+\end{itemize}
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,fill=P0!12,draw=P0] (a) at (0,1) {chiamata Python A};
+\node[box,fill=P1!12,draw=P1] (b) at (0,-1) {chiamata Python B};
+\node[box,fill=Coral!10,draw=Coral,text width=3.3cm] (lock) at (5,0) {mutex del contesto\\una preparazione per volta};
+\node[box,fill=Teal!12,draw=Teal] (calc) at (10,0) {PLASMA: team interno};
+\draw[arr] (a)--(lock);\draw[arr] (b)--(lock);\draw[arr] (lock)--(calc);
+\end{tikzpicture}
+\caption{Il mutex protegge il contesto fra chiamate, non serializza i worker numerici all'interno della singola preparazione.}
+\end{figure}
+\page{Costo, memoria e cammino critico}
+\begin{center}\small\begin{tabularx}{\linewidth}{lXX}\toprule
+Parte&Baseline LU&Due stadi\\\midrule
+Preparazione numerica&copia/shift per candidato&riduzione comune $\Theta(d^3)$, più banda--tri $O(d^2n_b)$\\
+Proiezione dei dati&assente&$O((m+c)d^2)$\\
+Soluzione per lambda&$\Theta(d^3)+O(d^2c)$&$O(dc)$\\
+Predizione per lambda&$O(mdc)$&$O(mdc)$\\
+Memoria dominante&$O(P_\lambda d^2)$ temporanea&$O(d^2+(m+c)d+P_\lambda dc)$ temporanea\\\bottomrule
+\end{tabularx}\end{center}
+Il primo $d^3$ non sparisce: viene pagato una volta, con operazioni a blocchi
+parallelizzabili. Più righe di validazione aumentano sia la proiezione di X
+sia lo scoring. I costi in tabella sono ordini di grandezza; le costanti e le
+copie dei buffer contano nelle misure reali.
+\begin{figure}[H]\centering
+\begin{tikzpicture}[x=1cm,y=.8cm]
+\node[anchor=east,font=\small] at (-.2,1){LU};
+\foreach \i in {0,...,5}{\filldraw[fill=Blue!45,draw=white] (\i*1.8, .6) rectangle ++(1.8,.8);}
+\node[anchor=east,font=\small] at (-.2,-.5){due stadi};
+\filldraw[fill=Orange!55,draw=white] (0,-.9) rectangle (3,-.1);
+\foreach \i in {0,...,5}{\filldraw[fill=Teal!50,draw=white] (3+\i*.65,-.9) rectangle ++(.65,.8);}
+\node[note,font=\scriptsize] at (1.5,-1.5){preparazione};\node[note,font=\scriptsize] at (5,-1.5){candidati più economici};
+\end{tikzpicture}
+\caption{Modello qualitativo dei costi: le lunghezze delle barre sono illustrative, non dati sperimentali.}
+\end{figure}
+Il limite di parallelismo dipende dal lavoro totale e dallo \emph{span},
+il cammino di dipendenze più lungo. Il costo della memoria condivisa e
+l'attesa sui flag possono limitare la scalabilità anche con molti task.
+\semplice{Il nuovo metodo costruisce una buona attrezzatura, poi la usa
+molte volte. Per pochi pezzi l'attrezzatura può costare più di ciò che fa risparmiare.}
+\page{La soglia di sorpasso: una formula utile, non universale}
+Indichiamo con $R$ la preparazione completa, incluse proiezioni e layout;
+con $f$ il costo per candidato LU e con $g$ quello di soluzione e scoring
+nel nuovo metodo. Una stima a ondate, per $P$ thread, è
+\begin{align}
+q(L)&=\left\lceil L/P\right\rceil,\\
+T_{\mathrm{LU}}(L)&\simeq a+q(L)f,\\
+T_{\mathrm{2st}}(L)&\simeq R+q(L)g,\\
+S(L)&=\frac{T_{\mathrm{LU}}(L)}{T_{\mathrm{2st}}(L)}.
+\end{align}
+Se $f>g$, il sorpasso richiede
+\[
+\boxed{q(L)>\frac{R-a}{f-g}}.
+\]
+Con parametri costanti e $R\ge a$, una previsione intera sarebbe
+\[
+q_{\min}=\left\lfloor\frac{R-a}{f-g}\right\rfloor+1,
+\qquad L_{\min}\simeq(q_{\min}-1)P+1.
+\]
+Il tempo reale include variazioni, bilanciamento, inizializzazione e
+dipendenze: la soglia va misurata su una CPU e su forme specifiche dei dati.
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,fill=Orange!12,draw=Orange] (r) at (0,1.1) {costo iniziale R};
+\node[box,fill=Blue!12,draw=Blue] (s) at (0,-1.1) {risparmio $f-g$};
+\node[box,fill=Teal!14,draw=Teal,text width=4cm] (v) at (6,0) {quante ondate servono\\per ripagare R?};
+\draw[arr] (r)--(v);\draw[arr] (s)--(v);
+\node[note,text width=4cm] at (11,0) {dipende da $d,m,c,P$\\e dalla macchina};
+\end{tikzpicture}
+\caption{Il numero di lambda da solo non determina il guadagno. Per $L\le P$ il numero di ondate può restare uno: raddoppiare L non raddoppia necessariamente il tempo LU.}
+\end{figure}
+\begin{attenzione}[title=Due speedup diversi]
+$T_{\mathrm{LU},P}/T_{\mathrm{2st},P}$ confronta algoritmi a budget uguale.
+$T_{\mathrm{2st},1}/T_{\mathrm{2st},P}$ misura invece la scalabilità del
+nuovo algoritmo. Il primo guadagno non si può attribuire interamente ai thread.
+\end{attenzione}
+\page{Risultati nuovi: dopo quanti lambda si supera LU?}
+La scansione allegata usa la \textbf{versione minima attuale}, CPU Apple M1
+Pro, input sintetici float64 con 256 esempi di training, 64 di validazione
+e tre classi. La matrice di ciascuna dimensione è identica fra conteggi e
+numero di thread. Ogni punto è la mediana di cinque ripetizioni.
+\begin{center}
+\begin{tabular}{rrrr}\toprule
+Feature $d$&Thread $P$&Primo $L$ con $S>1$&Primo di 3 punti con $S\ge1.10$\\\midrule
+\ThresholdRows
+\bottomrule\end{tabular}
+\end{center}
+Sono stati misurati tutti i valori $L=1,\ldots,32$, più 64 e 100. La quarta
+colonna richiede almeno il 10\% di vantaggio in tre valori consecutivi di L;
+è un criterio pratico esplicito, non un intervallo di confidenza o una
+promessa per tutte le griglie successive. Le oscillazioni vicino a uno
+consigliano di guardare anche i tempi grezzi e i quartili allegati.
+\begin{figure}[H]\centering
+\begin{minipage}{.48\linewidth}\centering
+\begin{tikzpicture}\begin{axis}[width=\linewidth,height=6.1cm,xmin=1,xmax=32,ymin=0,ymax=5.5,xlabel={numero di lambda L},ylabel={speedup LU / due stadi},title={$d=900$},title style={text=Ink},grid=major,grid style={Ink!10},legend style={font=\scriptsize},legend pos=north west,tick label style={font=\scriptsize},label style={font=\small}]
+\addplot[draw=none,fill=Ink!7,forget plot] coordinates {(1,.9)(32,.9)(32,1.1)(1,1.1)}\closedcycle;
+\addplot[Green,dashed,domain=1:32,forget plot]{1};
+\addplot[Blue,thick,mark=*,mark size=1.3pt,restrict x to domain=1:32] table[x=L,y=speedup,col sep=comma]{dati/d900_p4.csv};\addlegendentry{4 thread}
+\addplot[Orange,thick,mark=square*,mark size=1.3pt,restrict x to domain=1:32] table[x=L,y=speedup,col sep=comma]{dati/d900_p8.csv};\addlegendentry{8 thread}
+\end{axis}\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}{.48\linewidth}\centering
+\begin{tikzpicture}\begin{axis}[width=\linewidth,height=6.1cm,xmin=1,xmax=32,ymin=0,ymax=5.5,xlabel={numero di lambda L},ylabel={speedup LU / due stadi},title={$d=1024$},title style={text=Ink},grid=major,grid style={Ink!10},legend style={font=\scriptsize},legend pos=north west,tick label style={font=\scriptsize},label style={font=\small}]
+\addplot[draw=none,fill=Ink!7,forget plot] coordinates {(1,.9)(32,.9)(32,1.1)(1,1.1)}\closedcycle;
+\addplot[Green,dashed,domain=1:32,forget plot]{1};
+\addplot[Blue,thick,mark=*,mark size=1.3pt,restrict x to domain=1:32] table[x=L,y=speedup,col sep=comma]{dati/d1024_p4.csv};\addlegendentry{4 thread}
+\addplot[Orange,thick,mark=square*,mark size=1.3pt,restrict x to domain=1:32] table[x=L,y=speedup,col sep=comma]{dati/d1024_p8.csv};\addlegendentry{8 thread}
+\end{axis}\end{tikzpicture}
+\end{minipage}
+\caption{Misure reali. Sopra la linea verde il nuovo metodo supera la baseline LU allo stesso budget. Fascia grigia: $0.9\le S\le1.1$, dove piccole differenze meritano cautela. Non ci sono barre d'errore: quartili e singole ripetizioni sono nei CSV/JSON.}
+\end{figure}
+\semplice{Nel test da 900 feature il primo sorpasso compare a 9 lambda.
+A 8 thread il vantaggio vicino a quel punto è meno regolare: il criterio
+con margine del 10\% viene soddisfatto da 16 lambda. Non esiste un minimo
+unico valido per tutti i dataset.}
+\page{Il caso usato dal progetto: 100 candidati}
+Con $L=100$, i tempi dell'intera ricerca su input già preparati sono:
+\begin{center}
+\begin{tabular}{rrrrr}\toprule
+$d$&$P$&LU (ms)&Due stadi (ms)&Speedup\\\midrule
+\HundredRows
+\bottomrule\end{tabular}
+\end{center}
+\begin{figure}[H]\centering
+\begin{tikzpicture}\begin{axis}[width=.95\linewidth,height=7cm,xmin=1,xmax=100,ymin=0,xlabel={numero di lambda L},ylabel={tempo completo (ms)},grid=major,grid style={Ink!10},legend style={font=\small,at={(.5,-.21)},anchor=north,legend columns=2},tick label style={font=\small}]
+\addplot[Blue,thick,mark=*,mark size=1pt] table[x=L,y=lu_ms,col sep=comma]{dati/d900_p4.csv};\addlegendentry{LU, 4 thread}
+\addplot[Teal,thick,mark=triangle*,mark size=1.5pt] table[x=L,y=two_ms,col sep=comma]{dati/d900_p4.csv};\addlegendentry{due stadi, 4 thread}
+\addplot[Orange,dashed,thick,mark=square*,mark size=1pt] table[x=L,y=lu_ms,col sep=comma]{dati/d900_p8.csv};\addlegendentry{LU, 8 thread}
+\addplot[Purple,dashed,thick,mark=diamond*,mark size=1.5pt] table[x=L,y=two_ms,col sep=comma]{dati/d900_p8.csv};\addlegendentry{due stadi, 8 thread}
+\end{axis}\end{tikzpicture}
+\caption{Tempi misurati per $d=900$. Oltre L=32 sono presenti soltanto i punti 64 e 100: le linee li collegano e non rappresentano ulteriori misure. I gradini di LU dipendono anche dalle ondate di task.}
+\end{figure}
+\begin{attenzione}[title=Le vecchie soglie Cholesky]
+Il precedente risultato ``32 lambda'' si riferiva a Cholesky, in una
+versione sperimentale poi rimossa. Non è una soglia universale e non è il
+confronto di questa tabella. Per Cholesky erano stati misurati soltanto
+alcuni conteggi, perciò 32 era il primo valore verificato, non il minimo esatto.
+\end{attenzione}
+\page{Come sono misurati i tempi e come leggere il guadagno}
+Ogni chiamata misurata rifà validazione, allocazioni, contesto PLASMA,
+layout interno, riduzioni, entrambe le applicazioni di Q, soluzione dei
+sistemi, normalizzazione, scoring e scelta del lambda. Non c'è cache dei
+piani fra chiamate. La costruzione di Z, A, b e la conversione iniziale in
+float64/layout comune restano fuori dal timer per entrambi i metodi.
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,fill=Ink!7,draw=Ink!30,text width=3.7cm] (prep) at (0,0) {fuori timer\\input e import/warmup};
+\node[box,fill=Teal!14,draw=Teal,text width=5.1cm] (run) at (6,0) {dentro timer\\select\_lambda completo};
+\node[box,fill=Purple!12,draw=Purple,text width=3.7cm] (check) at (6,-1.7) {fuori timer\\controllo di tutti i risultati};
+\draw[arr] (prep)--(run);\draw[arr] (run)--(check);
+\node[note,text width=4.2cm] at (0,-1.7) {Ordine LU/due stadi rimescolato in ogni ripetizione.};
+\end{tikzpicture}
+\caption{Confini del cronometro. Non si misura la sola tridiagonalizzazione e non si nascondono le proiezioni di b o di X.}
+\end{figure}
+Il dataset di ciascuna forma usa lo stesso seed dello script minimo. I
+controlli confrontano tutte le accuracy per candidato e il lambda scelto
+con LU. Cinque ripetizioni producono una mediana e quartili; le CPU non
+sono vincolate con affinity. Frequenza, contesa e scheduling causano rumore.
+\begin{idea}[title={Speedup della fase, non dell'intero addestramento}]
+La nuova opzione modifica la ricerca finale dei lambda. La selezione
+locale dei kernel con \cod{RidgeClassifierCV}, l'estrazione ROCKET e il
+solve finale di W non diventano automaticamente più veloci.
+Se questa fase occupasse una frazione $f$ del tempo originale, il modello
+Amdahl darebbe
+\[
+S_{\mathrm{tot}}=\frac{1}{(1-f)+f/S_\lambda}.
+\]
+Per esempio, con $f=0.2$ e $S_\lambda=10$, il totale migliorerebbe di circa
+$1.22\times$. Il valore $f=0.2$ è illustrativo, non un profilo misurato qui.
+\end{idea}
+Nelle chiamate federate senza validation separata si usa
+$A-A_{\text{client}}$: ogni chiamata prepara la propria Q. Quattro client
+con 100 candidati significano normalmente quattro ricerche da 100, non
+un'unica preparazione condivisa su 400 candidati.
+\page{Comandi: compilare senza cambiare il percorso originale}
+I comandi si lanciano dalla radice \cod{fed2rc_parallel}, salvo dove è
+indicato \cod{cd code}. Si assume l'ambiente del progetto e la directory
+UCR del repository. Sul Mac usato sono presenti LLVM, libomp, OpenBLAS e CMake.
+\begin{lstlisting}[language=bash]
+# Solo se mancano i prerequisiti macOS:
+brew install llvm libomp openblas cmake
+
+# Nell'ambiente Python del progetto:
+.venv/bin/python -m pip install pybind11 setuptools wheel pytest
+.venv/bin/python -m pip install --no-deps --no-build-isolation -e .
+
+# Costruisce il SOLO backend opzionale; PLASMA ha una revisione fissata.
+.venv/bin/python build_twostage.py
+\end{lstlisting}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=8mm]
+\node[box,fill=Blue!12,text width=4cm] (py) at (0,0) {openmp\_utils.py\\selettore lu / two\_stage};
+\node[box,fill=Teal!13,draw=Teal,text width=4cm] (opt) at (6,0) {\_fed2rc\_twostage\\binding C++};
+\node[box,fill=Orange!14,draw=Orange,text width=4cm] (c) at (6,-1.6) {twostage\_plasma.c\\wavefront e applicazione Q};
+\node[box,fill=Purple!12,draw=Purple,text width=4cm] (lib) at (0,-3.2) {PLASMA + BLAS/LAPACK\\libomp condivisa};
+\node[box,fill=Ink!6,draw=Ink!35,text width=4cm] (old) at (0,-1.6) {\_fed2rc\_openmp\\baseline originale};
+\draw[arr] (py)--(opt);\draw[arr] (py)--(old);\draw[arr] (opt)--(c);\draw[arr] (c)--(lib);\draw[arr] (old)--(lib);
+\end{tikzpicture}
+\caption{Dipendenze: il modulo standard non acquista un vincolo a PLASMA. Il backend opzionale viene importato soltanto quando viene scelto.}
+\end{figure}
+La dipendenza viene scaricata al primo build e conservata in
+\cod{build/two_stage/plasma}; si compila soltanto il target PLASMA necessario,
+poi il modulo opzionale in \cod{code/}. Il build allinea libomp a quella
+usata dal progetto per evitare di caricare due runtime OpenMP distinti.
+Il metodo di produzione ha tile 64 e blocco interno 16: i vecchi flag
+\cod{--bandwidth} e \cod{--spike-blocks} non fanno parte della versione minima.
+\page{Comandi: test di correttezza e prova completa}
+\begin{lstlisting}[language=bash]
+# Tutti i test: risultato verificato per la versione documentata, 296 passati.
+NUMBA_NUM_THREADS=4 NUMBA_THREADING_LAYER=omp \
+OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
+.venv/bin/python -m pytest tests -q
+
+# Solo le verifiche del nuovo metodo:
+NUMBA_NUM_THREADS=4 OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
+.venv/bin/python -m pytest tests/test_twostage.py -q
+
+# Test mirato della pubblicazione ai bordi:
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=1 \
+.venv/bin/python -m pytest tests/test_twostage.py \
+  -k repeated_wavefront_publication -q
+\end{lstlisting}
+\begin{attenzione}[title=Controllare anche gli skip]
+Se il modulo opzionale non è compilato, il file di test dedicato viene
+saltato da \cod{pytest.importorskip}. Uno skip non prova la correttezza
+del backend: compilare prima e controllare il riepilogo.
+\end{attenzione}
+\begin{lstlisting}[language=bash]
+# Esecuzione reale dal percorso richiesto dal loader UCR.
+cd code
+OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 NUMBA_NUM_THREADS=4 \
+../.venv/bin/python fed2rc_no_fluke.py \
+  --engine parallel --lambda-solver two_stage --debug \
+  --datasets GunPoint --experiment-seeds 1 -c 4 -k 100 -r 2
+
+# Per il confronto predefinito LU, stesso comando togliendo:
+# --lambda-solver two_stage
+cd ..
+\end{lstlisting}
+La prova completa verificata conserva accuracy $0.98$, F1
+$0.9795918367$ e le stesse cardinalità dei kernel selezionati di LU:
+$100\to58\to54$. Questo caso piccolo controlla l'integrazione, non dimostra
+un vantaggio per matrici grandi. Lo script originale stampa ancora il numero
+iniziale di kernel nell'ultima riga: per la dimensione finale guardare i round.
+\begin{idea}[title=Esempio Python]
+\begin{lstlisting}[language=Python]
+from openmp_utils import select_lambda
+best_lambda, best_accuracy, scores = select_lambda(
+    A, b, X_validation, y_validation, lambdas,
+    threads=8, solver="two_stage",
+)
+\end{lstlisting}
+Gli input devono restare immutabili durante la chiamata.
+\end{idea}
+\page{Comandi: riprodurre benchmark, soglie e PDF}
+Il benchmark minimo già nel progetto confronta LU e due stadi:
+\begin{lstlisting}[language=bash]
+OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 NUMBA_NUM_THREADS=4 \
+.venv/bin/python benchmark_twostage.py \
+  --features 128 900 1024 --threads 4 --lambdas 100 --repeats 5
+
+# Cambiare un conteggio singolo, per esempio:
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=1 \
+.venv/bin/python benchmark_twostage.py \
+  --features 900 --threads 8 --lambdas 16 --repeats 5
+\end{lstlisting}
+Per rigenerare la scansione specifica di questo documento, si usa il tool
+nella sola cartella di documentazione. Nessun solver di produzione viene modificato.
+\begin{lstlisting}[language=bash]
+# 1..32, 64, 100 lambda; D=900/1024; P=4/8; 5 ripetizioni.
+# Non avviare altri test/build pesanti durante queste misure.
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=1 NUMBA_NUM_THREADS=4 \
+.venv/bin/python docs/two_stage/misura_soglia.py
+
+# Genera DAG, simulazione temporale, esempio numerico e tabelle.
+.venv/bin/python docs/two_stage/genera_figure.py
+
+# TeX Live/MacTeX con TikZ, PGFPlots, AMSMath e tcolorbox.
+cd docs/two_stage
+pdflatex -interaction=nonstopmode -halt-on-error metodo_due_stadi.tex
+pdflatex -interaction=nonstopmode -halt-on-error metodo_due_stadi.tex
+\end{lstlisting}
+\begin{center}\small\begin{tabularx}{\linewidth}{lX}\toprule
+File relativo alla cartella del documento&Contenuto\\\midrule
+\cod{dati/misure.json}&raw timing, hardware, quartili, hash del codice, verifiche\\
+\cod{dati/d900_p4.csv}, ecc.&dati effettivi usati da PGFPlots\\
+\cod{dati/task_esempio.json}&geometria dei 34 task e dipendenze\\
+\cod{dati/esempio_numerico.json}&matrici dell'esempio e punteggio verificato\\
+\cod{fig_dag.tex}, \cod{fig_timeline.tex}&figure vettoriali riproducibili\\\bottomrule
+\end{tabularx}\end{center}
+Non servono immagini esterne né shell escape per compilare il PDF:
+TikZ produce direttamente i disegni a colori e le formule restano vettoriali.
+Il codice di produzione rimane la versione minima; i nuovi file sono documentazione.
+\page{Che cosa dimostrano i test, e che cosa resta condizionato}
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\node[box,fill=Teal!15,draw=Teal,text width=4cm] (goal) at (5,0) {equivalenza del classificatore\\e correttezza parallela};
+\foreach \name/\x/\y/\co/\txt in {a/0/2/Blue/{ricostruzione $A\simeq QTQ^{\T}$},b/10/2/Purple/{ortogonalit\`a di Q},c/0/-2/Orange/{bordo e dimensioni dispari},d/10/-2/Green/{accuracy e lambda uguali}}{
+\node[box,fill=\co!13,draw=\co,text width=4cm] (\name) at (\x,\y) {\txt};\draw[arr] (\name)--(goal);}
+\end{tikzpicture}
+\caption{Verifiche complementari. La sola uguaglianza delle classi predette non basta a rilevare tutti gli errori nella trasformazione della matrice.}
+\end{figure}
+La suite verifica dimensioni piccole e dispari, ultimi tile incompleti,
+matrici a rango basso, ricostruzione e norme, confronto con solve denso,
+proiezione delle feature, riproducibilità delle accuracy fra conteggi di
+thread, parità, input invalidi e chiamate concorrenti. Il test ARM ripete
+320 ricostruzioni complessive sui casi previsti. Lo stato numerico viene
+controllato e gli errori di soluzione diventano eccezioni.
+Soltanto nei test si può passare $X=I$ all'interfaccia privata per recuperare
+una Q esplicita e controllarla: il percorso di produzione non costruisce I
+o Q dense a questo scopo.
+
+Le condizioni scientifiche del risultato sono importanti:
+\begin{itemize}
+\item $A$ deve essere simmetrica; $A+\lambda I$ deve risultare definita positiva
+  per usare DPTSV. Una Gram è semidefinita positiva in aritmetica esatta;
+  l'aritmetica finita può perturbare questa proprietà.
+\item Si preservano formula, epsilon e regole di selezione. Fattorizzazioni
+  diverse non garantiscono pesi identici bit per bit su ogni input.
+\item Molta validazione può rendere costosa $XQ$; le memorie dei riflettori e
+  dei buffer aumentano il workspace rispetto alla riduzione a uno stadio.
+\item Il protocollo federato non acquista nuovi messaggi con questa integrazione;
+  non vengono introdotte garanzie aggiuntive di differential privacy o secure aggregation.
+\item La riduzione a due stadi e il bulge chasing sono algoritmi noti. Il
+  contributo implementato qui è l'integrazione, il riuso per gli shift e la
+  gestione corretta delle dipendenze/pubblicazione nel percorso scelto.
+\end{itemize}
+\semplice{Il beneficio misurato è reale per questi carichi. La forma della
+matrice, i dati da proiettare e il numero di thread decidono quanto conviene
+su un altro caso. I bordi corretti sono indispensabili prima di parlare di velocità.}
+\page{Mappa fra teoria e sorgenti; glossario per l'esame}
+\begin{center}\small\begin{tabularx}{\linewidth}{lX}\toprule
+Sorgente&Responsabilità verificabile\\\midrule
+\cod{code/openmp_utils.py}&layout degli input; scelta lu/due stadi; massimo deterministico\\
+\cod{native/twostage_bindings.cpp}&controlli, contesto/GIL/mutex, packing di R, DPTSV, norma e scoring\\
+\cod{native/twostage_plasma.c}&orchestrazione PLASMA; wavefront C11; clipping e sentinelle; applicazione Q2 a destra\\
+\cod{native/solver.hpp}&baseline originale LU con parallelismo fra candidati\\
+\cod{build_twostage.py}&dipendenza fissata, compilazione opzionale e allineamento libomp\\
+\cod{tests/test_twostage.py}&equivalenza numerica, bordi e concorrenza\\\bottomrule
+\end{tabularx}\end{center}
+\begin{center}\small\begin{tabularx}{\linewidth}{lX}\toprule
+Termine&Significato nel metodo\\\midrule
+Task&unità di lavoro con dati e predecessori definiti\\
+Thread&worker che esegue i task assegnati o pronti\\
+Dipendenza&ordine necessario fra accessi a dati condivisi\\
+DAG&grafo aciclico delle dipendenze\\
+Wavefront&fronte di task che può avanzare rispettando il DAG\\
+Bordo&interfaccia di dati fra regioni; al margine fisico, limite degli indici validi\\
+Race condition&accessi concorrenti incompatibili senza l'ordine richiesto\\
+Release/acquire&pubblicazione dei dati dal produttore al consumatore\\
+Barriera&completamento della fase prima del consumo dei suoi risultati\\
+Località&riusare dati vicini o già presenti nella cache\\
+Oversubscription&più worker attivi del budget utile; evitata qui limitando le BLAS\\
+Speedup&rapporto fra due tempi, con baseline e scope espliciti\\\bottomrule
+\end{tabularx}\end{center}
+\begin{idea}[title=Una risposta breve da esame]
+``Trasformiamo ortogonalmente una Gram densa in una tridiagonale attraverso
+uno stadio a banda. Il primo stadio sfrutta task su tile; il secondo una
+wavefront con dipendenze locali, clipping al bordo e pubblicazione
+release/acquire. Trasformiamo anche termini noti e validazione. La stessa
+riduzione è riusata per tutti gli shift lambda; i sistemi e lo scoring sono
+poi distribuiti fra thread. Il guadagno va misurato includendo tutta la preparazione.''
+\end{idea}
+\clearpage
+\section*{Riferimenti primari e provenienza}\addcontentsline{toc}{section}{Riferimenti primari e provenienza}
+I diagrammi di architettura, matrici e memoria sono originali per questa
+spiegazione. Il DAG e la simulazione sono generati dalla geometria del
+codice locale; tutti i grafici delle prestazioni derivano da \cod{misure.json}.
+Gli esempi didattici piccoli non sono presentati come tracce o benchmark.
+I sorgenti numerici sono quelli della versione minima rispetto al commit
+base; gli hash sono inclusi nei dati. Il codice adattato da PLASMA mantiene
+la relativa attribuzione BSD nel progetto.
+\begin{thebibliography}{9}
+\bibitem{twostage} P. Luszczek, H. Ltaief, J. Dongarra.
+\emph{Two-Stage Tridiagonal Reduction for Dense Symmetric Matrices using
+Tile Algorithms on Multicore Architectures}. LAPACK Working Note 244, 2011.
+\url{https://netlib.org/lapack/lawnspdf/lawn244.pdf}.
+\bibitem{plasma} Innovative Computing Laboratory.
+\emph{PLASMA}, revisione\\
+\cod{548e0bdc5a046a728770bccf14503c37732c80fc}.\\
+\url{https://github.com/icl-utk-edu/plasma}.
+I file adattati sono identificati in \cod{THIRD_PARTY_NOTICES.md} e nel
+frontespizio di \cod{native/twostage_plasma.c}.
+\bibitem{lapack} LAPACK, \emph{DSYTRD\_2STAGE}: similarità ortogonale a due stadi.
+\url{https://netlib.org/lapack/explore-html/d2/d6e/group__hetrd__2stage_ga958ffe1e32d222382896feaef4b39419.html}.
+La pagina documenta anche il limite di disponibilità di VECT='V' nella
+release descritta: da qui la scelta del percorso PLASMA con riflettori conservati.
+\bibitem{dptsv} Reference LAPACK. \emph{DPTSV}, sorgente ufficiale: soluzione
+tridiagonale simmetrica definita positiva mediante $LDL^{\T}$.
+\url{https://github.com/Reference-LAPACK/lapack/blob/v3.12.1/SRC/dptsv.f}.
+\bibitem{c11} ISO/IEC JTC1/SC22/WG14. \emph{N1570: Committee Draft, C11},
+sezioni 5.1.2.4 e 7.17.3: ordinamento e sincronizzazione delle atomiche.
+\url{https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf}.
+\bibitem{openmp} OpenMP Architecture Review Board.
+\emph{OpenMP Application Programming Interface}, sezioni su task,
+dipendenze, worksharing e sincronizzazione.
+\url{https://www.openmp.org/wp-content/uploads/OpenMP-API-Specification-5-2.pdf}.
+Le atomiche della nostra wavefront sono C11; i team e il worksharing sono OpenMP.
+\end{thebibliography}
+\end{document}

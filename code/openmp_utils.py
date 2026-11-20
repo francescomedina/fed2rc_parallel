@@ -89,12 +89,13 @@ def transform_features(X, seeds, *, ppv_only=True, caching=True, threads=0,
                             ppv_only, threads, chunks)
 
 
-def select_lambda(A, b, X, y, lambdas, *, threads=0):
+def select_lambda(A, b, X, y, lambdas, *, threads=0, solver="lu"):
     """Valuta i lambda in parallelo e sceglie il migliore dopo la sincronizzazione.
 
     Prepariamo A/b per colonne (F), adatte a LAPACK; X resta per righe (C).
     Se tipo, layout e allineamento sono gia' compatibili, np.require non copia.
     Ogni worker C++ riusa i propri buffer per i candidati che gli sono assegnati.
+    solver='two_stage' usa la riduzione PLASMA opzionale (build_twostage.py).
     """
     A, b = [np.require(a, dtype=np.float64, requirements=["F", "A"]) for a in (A, b)]
     X = np.require(X, dtype=np.float64, requirements=["C", "A"])
@@ -105,7 +106,16 @@ def select_lambda(A, b, X, y, lambdas, *, threads=0):
     lambdas = np.require(lambdas, dtype=np.float64, requirements=["C", "A"])
     # Fase map: C++ risolve e valuta un sistema per ogni candidato lambda.
     # La chiamata torna quando tutti i worker hanno completato i loro risultati.
-    scores, status = native.lambda_scores(A, b, X, y, lambdas, threads)
+    if solver == "two_stage":
+        import _fed2rc_twostage
+        if threads < 0:
+            raise ValueError("threads must be nonnegative")
+        scores, status = _fed2rc_twostage.lambda_scores(
+            A, b, X, y, lambdas, threads or native.default_threads)
+    elif solver == "lu":
+        scores, status = native.lambda_scores(A, b, X, y, lambdas, threads)
+    else:
+        raise ValueError("solver must be lu or two_stage")
     failed = np.flatnonzero(status)
     if len(failed):
         i = int(failed[0])

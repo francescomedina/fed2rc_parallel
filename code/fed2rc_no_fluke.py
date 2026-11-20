@@ -33,7 +33,11 @@ parser.add_argument('--engine', choices=['parallel', 'classic', 'numba'], defaul
 parser.add_argument('--temporal-chunks', default=1,
                     type=lambda value: validate_temporal_chunks(value if value == 'auto' else int(value)),
                     help="Convolution output partitions: 1 (original), 2, 4, N, or auto")
+parser.add_argument('--lambda-solver', choices=['lu', 'two_stage'], default='lu',
+                    help='Optional PLASMA two-stage lambda search (native engine only)')
 args = parser.parse_args()
+if args.engine != 'parallel' and args.lambda_solver != 'lu':
+    parser.error('--lambda-solver requires --engine parallel')
 if args.engine == 'classic' and args.temporal_chunks != 1:
     parser.error('--temporal-chunks requires --engine parallel or numba')
 
@@ -55,6 +59,8 @@ elif args.engine == 'numba':
         return numba_transform(X, seeds, temporal_chunks=args.temporal_chunks)
 else:
     transform_seeds = partial(transform_seeds, temporal_chunks=args.temporal_chunks)
+    if args.lambda_solver == 'two_stage':
+        select_lambda = partial(select_lambda, solver='two_stage')
 
 def main():
     # Imported here because tests/test_openmp.py executes main() on its own.

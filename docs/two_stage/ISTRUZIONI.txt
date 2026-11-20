@@ -1,0 +1,11 @@
+DOCUMENTO SCIENTIFICO - SORGENTI COMPLETI
+
+Compilare in questa cartella con TeX Live o MacTeX:
+  pdflatex -interaction=nonstopmode -halt-on-error metodo_due_stadi.tex
+  pdflatex -interaction=nonstopmode -halt-on-error metodo_due_stadi.tex
+
+Tutte le figure sono vettoriali TikZ/PGFPlots; non servono shell escape o immagini esterne.
+I CSV e i file TeX generati sono gia inclusi.
+Per rigenerare misure e figure, collocare la cartella in docs/two_stage del repository
+e seguire i comandi nelle sezioni 25-27 del PDF.
+Le misure confrontano la versione minima con LU, non con i solver sperimentali rimossi.
