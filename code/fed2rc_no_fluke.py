@@ -35,7 +35,12 @@ parser.add_argument('--temporal-chunks', default=1,
                     help="Convolution output partitions: 1 (original), 2, 4, N, or auto")
 parser.add_argument('--lambda-solver', choices=['lu', 'two_stage'], default='lu',
                     help='Optional PLASMA two-stage lambda search (native engine only)')
+parser.add_argument('--blas-threads', type=int, default=1,
+                    help='BLAS threads for local RidgeClassifierCV, Gram products '
+                         'and the final solve (default: 1)')
 args = parser.parse_args()
+if args.blas_threads < 1:
+    parser.error('--blas-threads must be positive')
 if args.engine != 'parallel' and args.lambda_solver != 'lu':
     parser.error('--lambda-solver requires --engine parallel')
 if args.engine == 'classic' and args.temporal_chunks != 1:
@@ -62,9 +67,21 @@ else:
     if args.lambda_solver == 'two_stage':
         select_lambda = partial(select_lambda, solver='two_stage')
 
-def main():
+def main(*, blas_threads=1):
     # Imported here because tests/test_openmp.py executes main() on its own.
+    from contextlib import nullcontext
     from time import perf_counter
+    from threadpoolctl import ThreadpoolController
+
+    blas_phase = nullcontext
+    if blas_threads > 1:
+        # This driver executes these phases sequentially. Changing a BLAS
+        # limit inside parallel callers would race with its restoration.
+        controller = ThreadpoolController()
+
+        def blas_phase():
+            return controller.limit(limits=blas_threads, user_api="blas")
+
     #list_of_datasets = get_binary_dataset_names()
     #list_of_datasets = get_three_classes_dataset_names()
     #list_of_datasets = get_four_classes_dataset_names()
@@ -160,7 +177,8 @@ def main():
                         x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.1, random_state=experiment_seed)
                     client_seeds = dict_seeds[client_id]
                     x_trans = transform_seeds(x_train, client_seeds, ts_length)
-                    model = RidgeClassifierCV(alphas=np.logspace(-3,0,100)).fit(x_trans, y_train)
+                    with blas_phase():
+                        model = RidgeClassifierCV(alphas=np.logspace(-3,0,100)).fit(x_trans, y_train)
                     w = np.atleast_2d(model.coef_)[0]
                     train_acc = model.score(x_trans, y_train)
                     train_accuracies = np.concatenate([train_accuracies, [train_acc]])
@@ -197,9 +215,13 @@ def main():
                 x_train, y_train = s_X_train[client_id], s_Y_train[client_id]
                 client_seeds = dict_seeds[client_id]
                 x_trans = transform_seeds(x_train, client_seeds, ts_length)
+                # Accumulate the Gram in double precision: promoting its
+                # float32 result afterwards cannot restore positive semidefiniteness.
+                x_trans = np.asarray(x_trans, dtype=np.float64)
                 y_onehot = np.eye(n_classes)[y_train]
-                A_local = x_trans.T @ x_trans
-                b_local = x_trans.T @ y_onehot
+                with blas_phase():
+                    A_local = x_trans.T @ x_trans
+                    b_local = x_trans.T @ y_onehot
                 A_locals.append(A_local)
                 b_locals.append(b_local)
                         
@@ -235,7 +257,8 @@ def main():
                 local_best_accs = np.concatenate([local_best_accs, [best_accuracy]])
 
             A_final = A_global + np.sum(local_best_lambdas)/np.sum(local_best_accs) * np.eye(A_global.shape[0])
-            W_final = np.linalg.solve(A_final, b_global)
+            with blas_phase():
+                W_final = np.linalg.solve(A_final, b_global)
             W_final =  W_final / (np.linalg.norm(W_final, axis=0, keepdims=True) + 1e-10)
             X_test_trans = transform_seeds(X_test, round_selected_seeds, ts_length)
             y_pred = np.argmax(X_test_trans @ W_final, axis=1)
@@ -265,4 +288,4 @@ def main():
         wandb.finish()
 
 if __name__ == '__main__':
-    main()
+    main(blas_threads=args.blas_threads)

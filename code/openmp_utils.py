@@ -4,12 +4,12 @@ Percorso: Python -> bindings.cpp -> rocket.hpp / solver.hpp -> risultati Python.
 Gli input non devono essere modificati da altri thread durante una chiamata.
 La cache conserva solo i piccoli parametri dei filtri, indipendenti dal dataset:
 memorizzare le feature richiederebbe hash/copie dei dati o un contratto esplicito
-di immutabilita'. Numba resta interno a sktime.fit; i nostri cicli sono OpenMP.
+di immutabilita'. I parametri sono generati da sktime con Numba; le convoluzioni
+e la ricerca dei lambda sono OpenMP.
 """
 from functools import lru_cache
 
 import numpy as np
-from sktime.transformations.panel.rocket import Rocket
 from threadpoolctl import threadpool_limits
 from temporal import resolve_temporal_chunks, validate_temporal_chunks
 
@@ -26,9 +26,14 @@ _BLAS_LIMIT = threadpool_limits(limits=1, user_api="blas")
 @lru_cache(maxsize=4096)
 def _kernel(timepoints, seed):
     """Genera un filtro con sktime e conserva in cache i suoi parametri immutabili."""
-    rocket = Rocket(num_kernels=1, random_state=seed, n_jobs=1)
-    rocket.fit(np.zeros((1, 1, timepoints)))
-    weights, lengths, biases, dilations, paddings, _, _ = rocket.kernels
+    # Rocket._fit in sktime 1.1.0 chiama questo stesso generatore. Per un
+    # filtro univariato bastano lunghezza e seed, senza creare un estimator
+    # o fare la validazione del suo input di esempio per ogni cache miss.
+    from sktime.transformations.panel.rocket._rocket_numba import _generate_kernels
+
+    weights, lengths, biases, dilations, paddings, _, _ = _generate_kernels(
+        timepoints, 1, 1, seed
+    )
     # La chiave della cache e' (lunghezza della serie, seed): lo stesso seed
     # riproduce il filtro per quella lunghezza. Le tuple non sono modificabili.
     # lru_cache protegge i metadati, ma due richieste simultanee non in cache

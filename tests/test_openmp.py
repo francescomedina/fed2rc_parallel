@@ -59,6 +59,38 @@ def check_lambda_result(actual, expected):
     np.testing.assert_array_equal(actual[2], expected[2])
 
 
+def test_protocol_accumulates_gram_in_double_precision():
+    """Exercise the production aggregation block with rank-deficient float32 features.
+
+    The cast must precede matmul: a float64 accumulator cannot undo rounding
+    in each float32 Gram, which may invalidate the SPD tridiagonal solve.
+    """
+    from contextlib import nullcontext
+
+    source = ast.parse((ROOT / "code/fed2rc_no_fluke.py").read_text())
+    loop = next(node for node in ast.walk(source) if isinstance(node, ast.For)
+                and any(isinstance(stmt, ast.AugAssign)
+                        and isinstance(stmt.target, ast.Name)
+                        and stmt.target.id == "A_global" for stmt in node.body))
+    rng = np.random.default_rng(41)
+    features = rng.uniform(.1, 1., size=(64, 512)).astype(np.float32) * 16
+    labels = rng.integers(3, size=64)
+    namespace = dict(np=np, n_clients=2, n_classes=3, ts_length=512,
+                     s_X_train=np.array_split(features, 2),
+                     s_Y_train=np.array_split(labels, 2),
+                     dict_seeds={i:range(512) for i in range(2)},
+                     transform_seeds=lambda x, seeds, length: x, blas_phase=nullcontext,
+                     A_global=np.zeros((512, 512)), b_global=np.zeros((512, 3)),
+                     A_locals=[], b_locals=[])
+    exec(compile(ast.Module(body=[loop], type_ignores=[]), "gram_aggregation.py", "exec"), namespace)
+    assert all(a.dtype == np.float64 for a in namespace["A_locals"])
+    assert all(b.dtype == np.float64 for b in namespace["b_locals"])
+    reference = features.astype(np.float64)
+    np.testing.assert_allclose(namespace["A_global"], reference.T@reference, rtol=3e-14)
+    np.testing.assert_allclose(namespace["b_global"], reference.T@np.eye(3)[labels], rtol=3e-14)
+    np.linalg.cholesky(namespace["A_global"] + 1e-3*np.eye(512))
+
+
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
 @pytest.mark.parametrize("strided", [False, True])
 @pytest.mark.parametrize("ppv_only", [False, True])
@@ -111,6 +143,19 @@ def test_kernel_generation_does_not_depend_on_call_order(original_transform):
     transform_features(X, [5, 6, 7], threads=4)
     np.testing.assert_array_equal(transform_features(X, [91, 2, 0], threads=4), expected)
     np.testing.assert_array_equal(transform_features(X, [0, 2, 91], threads=1), expected[:, ::-1])
+
+
+def test_kernel_parameters_match_public_rocket_fit():
+    from openmp_utils import _kernel
+
+    # Cover short series and the seed boundary as well as typical lengths.
+    for timepoints in (2, 7, 150, 1001):
+        for seed in (0, 1, 91, 2**31 - 1):
+            estimator = Rocket(num_kernels=1, random_state=seed, n_jobs=1)
+            estimator.fit(np.zeros((1, 1, timepoints)))
+            weights, lengths, biases, dilations, paddings, _, _ = estimator.kernels
+            expected = (tuple(weights), lengths[0], biases[0], dilations[0], paddings[0])
+            assert _kernel(timepoints, seed) == expected
 
 
 @pytest.mark.parametrize("matrix_kind", ["positive_definite", "indefinite", "nonsymmetric"])
@@ -390,6 +435,7 @@ def test_full_federated_protocol_matches_original(original_transform, capsys):
     from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import LabelEncoder
     from sktime.datasets import load_arrow_head
+    from threadpoolctl import ThreadpoolController
     from utils import preprocess_data, split_function
 
     train, train_labels = load_arrow_head(split="train", return_type="numpy3D")
@@ -403,8 +449,10 @@ def test_full_federated_protocol_matches_original(original_transform, capsys):
     ).stdout
     current_source = (ROOT / "code" / "fed2rc_no_fluke.py").read_text()
 
-    def run(source, threads):
+    def run(source, threads, *, blas_threads=1):
         trace = {"seeds": [], "predictions": [], "metrics": []}
+        blas_info = ThreadpoolController().select(user_api="blas").info
+        initial_blas_info = blas_info()
 
         def transform(X, seeds, ts_length):
             trace["seeds"].append(np.asarray(seeds).copy())
@@ -415,6 +463,10 @@ def test_full_federated_protocol_matches_original(original_transform, capsys):
         def accuracy(y, predictions):
             trace["predictions"].append(np.asarray(predictions).copy())
             return accuracy_score(y, predictions)
+
+        def search(*inputs):
+            assert blas_info() == initial_blas_info
+            return select_lambda(*inputs, threads=threads)
 
         offline_wandb = SimpleNamespace(
             init=lambda **kwargs: None, finish=lambda: None,
@@ -435,19 +487,23 @@ def test_full_federated_protocol_matches_original(original_transform, capsys):
             "RocketKernel": original_transform["RocketKernel"],
             "RidgeClassifierCV": RidgeClassifierCV, "train_test_split": train_test_split,
             "transform_seeds": transform, "accuracy_score": accuracy, "f1_score": f1_score,
-            "select_lambda": lambda *args: select_lambda(*args, threads=threads),
+            "select_lambda": search,
         }
         main = next(node for node in ast.parse(source).body
                     if isinstance(node, ast.FunctionDef) and node.name == "main")
         exec(compile(ast.Module(body=[main], type_ignores=[]), "protocol_main.py", "exec"), namespace)
-        namespace["main"]()
+        if blas_threads == 1:
+            namespace["main"]()
+        else:
+            namespace["main"](blas_threads=blas_threads)
+        assert blas_info() == initial_blas_info
         return trace
 
     expected = run(baseline_source, None)
     assert len(expected["metrics"]) == 1
     assert len(expected["predictions"][-1]) == len(test_labels)
     for threads in (1, 4):
-        actual = run(current_source, threads)
+        actual = run(current_source, threads, blas_threads=threads)
         assert len(actual["seeds"]) == len(expected["seeds"])
         for seeds, reference_seeds in zip(actual["seeds"], expected["seeds"]):
             np.testing.assert_array_equal(seeds, reference_seeds)

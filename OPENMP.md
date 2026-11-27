@@ -5,7 +5,10 @@ Questa variante parte dal commit
 implementati in C++17 e chiamati dal programma Python tramite pybind11.
 Le direttive OpenMP sono nel codice utilizzato da Fed2RC, non soltanto in una
 demo. La generazione dei parametri ROCKET resta quella di `sktime==1.1.0`:
-usa internamente Numba, ma la nostra esecuzione parallela è OpenMP nativo.
+chiamiamo direttamente il generatore Numba usato da `Rocket.fit` per evitare
+di costruire e validare un estimatore per ogni seed. I test confrontano tutti
+i parametri del filtro con quelli restituiti da `Rocket.fit`. Le convoluzioni
+usano OpenMP nativo.
 
 ## Compilazione e verifica
 
@@ -157,6 +160,15 @@ Le BLAS sono limitate a un thread per evitare **oversubscription** e
 parallelismo annidato. Il limite è una politica del processo impostata
 all'importazione, non un contesto temporaneo aperto e ripristinato da ogni
 chiamata concorrente. Non modificarlo durante l'esecuzione dei kernel.
+
+In `fed2rc_no_fluke.py`, `--blas-threads 4` permette alle librerie BLAS
+riconosciute da `threadpoolctl` di usare fino a quattro thread per
+`RidgeClassifierCV.fit`, per i prodotti che costruiscono le matrici locali
+e per il solve finale. Al termine di ciascuna fase il limite precedente
+viene ripristinato, quindi la ricerca dei lambda (LU o two-stage) usa ancora
+un thread BLAS per worker OpenMP. Il valore predefinito è 1.
+Su macOS, Accelerate mantiene la configurazione di avvio
+(`VECLIB_MAXIMUM_THREADS`) anche con questa opzione.
 
 ## GIL, cache e contratto degli input
 
